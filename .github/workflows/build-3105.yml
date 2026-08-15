@@ -1,4 +1,4 @@
-name: Build 3105 (unsigned .app for eSign)
+name: Build 3105
 
 on:
   workflow_dispatch:
@@ -29,7 +29,7 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             archive
 
-      - name: Create unsigned .app
+      - name: Package IPA (Payload/3105.app structure)
         run: |
           set -euo pipefail
           APP_DIR="build/3105.xcarchive/Products/Applications/3105.app"
@@ -38,15 +38,18 @@ jobs:
             ls build/3105.xcarchive/Products/Applications/
             exit 1
           fi
-          mkdir -p build/3105-app
-          cp -r "$APP_DIR" build/3105-app/
-          cd build/3105-app
-          # Zip .app nhưng để Info.plist ở root để eSign/AltStore nhận diện
-          zip -r 3105-unsigned.app.zip 3105.app
+          rm -rf build/ipa
+          mkdir -p build/ipa/Payload
+          cp -r "$APP_DIR" build/ipa/Payload/
+          cd build/ipa
+          zip -r 3105.ipa Payload
+          ls -la
+          echo "---"
+          unzip -l 3105.ipa | head -20
 
-      - name: Upload .app artifact
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: 3105-unsigned-app
-          path: build/3105-app/3105-unsigned.app.zip
+          name: 3105-ipa
+          path: build/ipa/3105.ipa
           if-no-files-found: error
