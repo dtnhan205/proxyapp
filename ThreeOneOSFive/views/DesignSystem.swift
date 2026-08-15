@@ -71,9 +71,18 @@ struct TechBackground: View {
                 endPoint: .bottom
             )
 
-            // Grid pattern
-            TechGridPattern()
-                .stroke(AppTheme.neonCyan.opacity(0.06), lineWidth: 1)
+            // Soft dotted matrix (replaces the previous checkerboard-like grid) — masked with a
+            // radial fade so the dots fade out toward the edges instead of tiling uniformly.
+            TechDotMatrixCanvas()
+                .opacity(0.85)
+                .mask(
+                    RadialGradient(
+                        colors: [.white, .white, .clear],
+                        center: .center,
+                        startRadius: 80,
+                        endRadius: 480
+                    )
+                )
 
             // Diagonal accent lines, animated to drift sideways slowly.
             TechDiagonalLines()
@@ -132,24 +141,48 @@ struct TechBackground: View {
     }
 }
 
-private struct TechGridPattern: Shape {
-    var spacing: CGFloat = 28
+/// A canvas that draws a uniform dot matrix — replaces the previous hard grid so the
+/// background reads as a soft starfield / circuit-board rather than a square tile.
+private struct TechDotMatrixCanvas: View {
+    var spacing: CGFloat = 24
+    var dotRadius: CGFloat = 0.9
 
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        var x: CGFloat = 0
-        while x <= rect.width {
-            path.move(to: CGPoint(x: x, y: 0))
-            path.addLine(to: CGPoint(x: x, y: rect.height))
-            x += spacing
+    // Subtle accent dots in cyan + magenta, scattered sparsely (every 5 cells along each axis)
+    // to add visual depth — so the matrix isn't a perfectly regular grid.
+    private func isAccent(row: Int, col: Int) -> Bool {
+        (row % 5 == 0 && col % 7 == 0) || (row % 7 == 0 && col % 5 == 0)
+    }
+
+    var body: some View {
+        Canvas { context, size in
+            var col = 0
+            var x: CGFloat = spacing / 2
+            while x <= size.width {
+                var row = 0
+                var y: CGFloat = spacing / 2
+                while y <= size.height {
+                    let isAccentDot = isAccent(row: row, col: col)
+                    let radius = isAccentDot ? 1.6 : dotRadius
+                    let color = isAccentDot
+                        ? AppTheme.neonMagenta.opacity(0.28)
+                        : AppTheme.neonCyan.opacity(0.18)
+                    let rect = CGRect(
+                        x: x - radius,
+                        y: y - radius,
+                        width: radius * 2,
+                        height: radius * 2
+                    )
+                    context.fill(
+                        Path(ellipseIn: rect),
+                        with: .color(color)
+                    )
+                    y += spacing
+                    row += 1
+                }
+                x += spacing
+                col += 1
+            }
         }
-        var y: CGFloat = 0
-        while y <= rect.height {
-            path.move(to: CGPoint(x: 0, y: y))
-            path.addLine(to: CGPoint(x: rect.width, y: y))
-            y += spacing
-        }
-        return path
     }
 }
 

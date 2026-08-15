@@ -53,7 +53,7 @@
 "patch.tap_to_unlock" = "Tap to enter its password";
 "patch.password_protected" = "Password protected";
 "patch.rules_count" = "%lld replacement rules";
-"patch.menu_title" = "Patch Menu";
+"patch.menu_title" = "PROXYVIPVN V2";
 "patch.menu_auto_badge" = "AUTO";
 "patch.toggle_on_success" = "%@ turned on";
 "patch.toggle_off_success" = "%@ turned off";

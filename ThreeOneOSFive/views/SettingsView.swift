@@ -36,7 +36,7 @@ struct SettingsView: View {
                 AppLogo()
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("CheatiOS DSW")
+                    Text("TheNhanCheat")
                         .font(.headline)
                         .foregroundStyle(.primary)
                     Text(language.text("common.version", appVersion))
