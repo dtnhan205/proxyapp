@@ -156,7 +156,7 @@ struct SettingsView: View {
                 .foregroundStyle(.primary)
             Spacer()
             Text(value)
-                .font(monospace ? .subheadline.monospaced() : .subheadline.weight(.semibold))
+                .font(monospace ? Font.subheadline.monospaced() : Font.subheadline.weight(.semibold))
                 .foregroundStyle(accent)
                 .shadow(color: accent.opacity(0.4), radius: 4)
         }

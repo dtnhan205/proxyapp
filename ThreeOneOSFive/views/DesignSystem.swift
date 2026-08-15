@@ -329,7 +329,7 @@ struct NeonSectionHeader: View {
                 .fill(tint)
                 .frame(width: 3, height: 16)
                 .shadow(color: tint.opacity(0.7), radius: 4)
-            if let symbol {
+            if let symbol = symbol {
                 Image(systemName: symbol)
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(tint)
@@ -437,7 +437,7 @@ struct PulsingDot: View {
             Circle()
                 .fill(color.opacity(0.35))
                 .frame(width: size * 2.4, height: size * 2.4)
-                .scaleEffect(reduceMotion ? 1.0 : (1.0 + pulse * 0.6))
+                .scaleEffect(reduceMotion ? 1.0 : CGFloat(1.0 + pulse * 0.6))
                 .opacity(reduceMotion ? 0.35 : (0.55 - pulse * 0.45))
             Circle()
                 .fill(color)

@@ -175,7 +175,7 @@ struct GameCardView: View {
                         endPoint: .bottomTrailing
                     )
                     .rotationEffect(.degrees(20))
-                    .offset(x: glowPhase * 200 - 100)
+                    .offset(x: CGFloat(glowPhase * 200 - 100))
                     .blendMode(.overlay)
                 }
                 iconView
