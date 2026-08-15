@@ -149,7 +149,7 @@ struct PatchProjectsView: View {
                 .multilineTextAlignment(.center)
             Button(language.text("patch.new")) { showCreate = true }
                 .buttonStyle(.plain)
-                .neonTint(AppTheme.neonCyan)
+                .neonButtonTint(AppTheme.neonCyan)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 64)
@@ -405,7 +405,7 @@ struct PatchProjectDetailView: View {
             } else {
                 Toggle("", isOn: toggleBinding(for: rule))
                     .labelsHidden()
-                    .neonTint(tint)
+                    .neonToggleTint(tint)
                     .disabled(!rule.canToggle)
             }
         }

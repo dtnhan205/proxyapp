@@ -171,7 +171,7 @@ struct AppDataBrowserView: View {
                 .padding()
             Button(language.text("browser.retry")) { reload() }
                 .buttonStyle(.plain)
-                .neonTint(AppTheme.neonCyan)
+                .neonButtonTint(AppTheme.neonCyan)
         }
         .padding()
     }

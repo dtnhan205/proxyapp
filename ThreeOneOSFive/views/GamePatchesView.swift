@@ -265,7 +265,7 @@ struct GamePatchesView: View {
             } else {
                 Toggle("", isOn: projectToggleBinding(for: item))
                     .labelsHidden()
-                    .neonTint(rowColor)
+                    .neonToggleTint(rowColor)
                     .disabled(toggleableCount == 0)
             }
         }
@@ -409,14 +409,18 @@ struct GamePatchesView: View {
             // failure partway through the loop would otherwise show a state that never
             // really landed on every file.
             let actualState = toggleableRules.allSatisfy { DevicePatchService.currentRuleState(for: $0) == true }
+            // Capture `failure` into a local before hopping to the main actor, so the
+            // closure doesn't reference the mutable `var` from the detached task context
+            // (which would warn under Swift 6 concurrency rules).
+            let capturedFailure = failure
             await MainActor.run {
                 togglingProjectID = nil
                 projectStates[item.id] = actualState
-                if let failure {
+                if let capturedFailure {
                     store.alert = PatchStoreAlert(
                         titleKey: "common.failed",
-                        messageKey: failure.localizationKey,
-                        messageArgument: failure.localizationArgument
+                        messageKey: capturedFailure.localizationKey,
+                        messageArgument: capturedFailure.localizationArgument
                     )
                 } else if actualState == isOn {
                     let name = item.project?.name ?? language.text("patch.locked_project")

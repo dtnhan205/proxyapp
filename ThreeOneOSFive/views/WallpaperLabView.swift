@@ -127,7 +127,7 @@ struct WallpaperLabView: View {
                         .multilineTextAlignment(.center)
                     Button(language.text("wallpaper.import")) { showImporter = true }
                         .buttonStyle(.plain)
-                        .neonTint(AppTheme.neonCyan)
+                        .neonButtonTint(AppTheme.neonCyan)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 20)
@@ -251,7 +251,7 @@ struct WallpaperLabView: View {
                 .frame(maxWidth: .infinity, minHeight: 44)
         }
         .buttonStyle(.plain)
-        .neonTint(AppTheme.neonCyan)
+        .neonButtonTint(AppTheme.neonCyan)
         .disabled(selectedPackage == nil || report?.canInstall != true || isBusy)
         .padding(.vertical, 4)
     }

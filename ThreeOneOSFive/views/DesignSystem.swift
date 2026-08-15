@@ -415,9 +415,11 @@ struct NeonToggleStyle: ToggleStyle {
     }
 }
 
-extension Toggle {
-    /// Convenience to apply the cyberpunk neon style with a chosen accent color.
-    func neonTint(_ color: Color = AppTheme.neonCyan) -> some View {
+extension View {
+    /// Convenience to apply the cyberpunk neon style with a chosen accent color on a Toggle.
+    /// Placed on `View` rather than `Toggle` because `.labelsHidden()` returns `some View`,
+    /// so the call site no longer has a concrete `Toggle` to dispatch to.
+    func neonToggleTint(_ color: Color = AppTheme.neonCyan) -> some View {
         self.toggleStyle(NeonToggleStyle(onColor: color))
     }
 }
@@ -482,8 +484,11 @@ extension ButtonStyle where Self == NeonButtonStyle {
     static var neon: NeonButtonStyle { NeonButtonStyle() }
 }
 
-extension Button {
-    func neonTint(_ color: Color = AppTheme.neonCyan) -> some View {
+extension View {
+    /// Convenience to apply the cyberpunk neon style to a Button.
+    /// Placed on `View` rather than `Button` because `.buttonStyle(.plain)` returns `some View`,
+    /// so the call site no longer has a concrete `Button` to dispatch to.
+    func neonButtonTint(_ color: Color = AppTheme.neonCyan) -> some View {
         self.buttonStyle(NeonButtonStyle(tint: color))
     }
 }
