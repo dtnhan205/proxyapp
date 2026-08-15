@@ -12,7 +12,7 @@ struct ThreeOneOSFiveApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootView()
                 .environmentObject(appState)
                 .environmentObject(patchDraftCoordinator)
                 .environment(\.appLanguage, language)

@@ -9,6 +9,8 @@ struct GamePatchesView: View {
     @State private var projectStates: [UUID: Bool] = [:]
     @State private var togglingProjectID: UUID?
     @State private var toast: ToastMessage?
+    @State private var showKeySheet = false
+    @State private var keyBannerVisible = true
     @AppStorage("patch.importedOnlineIDs") private var importedOnlineIDsRaw = ""
     @AppStorage("patch.gameAssignments") private var gameAssignmentsRaw = "{}"
     @AppStorage("patch.remoteToLocalMap") private var remoteToLocalMapRaw = "{}"
@@ -39,6 +41,9 @@ struct GamePatchesView: View {
             ScrollView {
                 VStack(spacing: 20) {
                     header
+                    if !hasValidKey {
+                        licenseBanner
+                    }
                     menuCard
                 }
                 .padding(.horizontal, 16)
@@ -77,7 +82,69 @@ struct GamePatchesView: View {
                 dismissButton: .default(Text(language.text("common.ok")))
             )
         }
+        .sheet(isPresented: $showKeySheet) {
+            LicenseKeyView { _ in
+                toast = ToastMessage(text: "Kích hoạt key thành công")
+                // Reset visible toggles so the user sees a fresh state.
+                Task { await loadProjectStates() }
+            }
+        }
         .toast($toast)
+    }
+
+    private var hasValidKey: Bool {
+        LicenseKeyManager.savedKey != nil && LicenseKeyManager.isSavedKeyValidNow
+    }
+
+    /// Yellow banner shown above the menu whenever there is no valid saved
+    /// license key. Tapping it (or "NHẬP KEY") opens the activation sheet.
+    private var licenseBanner: some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 10) {
+                Image(systemName: "exclamationmark.shield.fill")
+                    .font(.title3)
+                    .foregroundStyle(AppTheme.neonMagenta)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("VUI LÒNG NHẬP KEY")
+                        .font(.subheadline.weight(.heavy))
+                        .tracking(1.0)
+                        .foregroundStyle(.primary)
+                    Text("Bật/tắt patch sẽ bị chặn cho đến khi bạn kích hoạt key.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            Button {
+                showKeySheet = true
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "key.fill")
+                    Text("NHẬP KEY")
+                        .font(.footnote.weight(.heavy))
+                        .tracking(1.2)
+                }
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(
+                    LinearGradient(
+                        colors: [AppTheme.neonCyan, AppTheme.neonMagenta],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .shadow(color: AppTheme.neonCyan.opacity(0.45), radius: 10)
+            }
+        }
+        .padding(14)
+        .background(AppTheme.techCardFill)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(AppTheme.neonMagenta.opacity(0.4), lineWidth: 1)
+        )
     }
 
     /// The single bordered box holding every patch for this game as a switch row, matching the
@@ -266,10 +333,11 @@ struct GamePatchesView: View {
                 Toggle("", isOn: projectToggleBinding(for: item))
                     .labelsHidden()
                     .neonToggleTint(rowColor)
-                    .disabled(toggleableCount == 0)
+                    .disabled(!hasValidKey || toggleableCount == 0)
             }
         }
         .padding(.vertical, 10)
+        .opacity(hasValidKey ? 1.0 : 0.5)
     }
 
     private func projectToggleBinding(for item: PatchLibraryItem) -> Binding<Bool> {
@@ -393,8 +461,39 @@ struct GamePatchesView: View {
     private func setProjectState(_ isOn: Bool, item: PatchLibraryItem) {
         let toggleableRules = (item.project?.rules ?? []).filter(\.canToggle)
         guard !toggleableRules.isEmpty, togglingProjectID == nil else { return }
+
+        // License gate: every toggle verifies the saved key with the server
+        // before touching the filesystem. A revoked / expired / missing key
+        // short-circuits and surfaces the activation sheet for the user.
+        guard hasValidKey else {
+            toast = ToastMessage(text: "Vui lòng nhập key để sử dụng")
+            showKeySheet = true
+            return
+        }
+
         togglingProjectID = item.id
         Task.detached(priority: .userInitiated) {
+            // Server-side verification first — admin can revoke the key in
+            // real time and the next toggle will be blocked accordingly.
+            do {
+                _ = try await LicenseKeyManager.verifySavedKey()
+            } catch let err as LicenseKeyError {
+                let msg = err.errorDescription ?? "Key không hợp lệ"
+                await MainActor.run {
+                    togglingProjectID = nil
+                    toast = ToastMessage(text: "Vui lòng nhập key để sử dụng")
+                    showKeySheet = true
+                }
+                AppLog.shared.append("[license] verify failed before toggle: \(msg)")
+                return
+            } catch {
+                await MainActor.run {
+                    togglingProjectID = nil
+                    toast = ToastMessage(text: "Lỗi xác thực key. Vui lòng thử lại")
+                }
+                return
+            }
+
             var failure: PatchPackageError?
             for rule in toggleableRules {
                 do {
