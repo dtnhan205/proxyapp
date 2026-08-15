@@ -1,0 +1,8 @@
+out-ipa/
+build/
+*.xcarchive/
+.DS_Store
+xcuserdata/
+*.xcuserstate
+DerivedData/
+*.ipa
