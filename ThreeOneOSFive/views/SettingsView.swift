@@ -6,52 +6,123 @@ struct SettingsView: View {
     @AppStorage(AppLanguage.storageKey) private var languageCode = AppLanguage.english.rawValue
 
     var body: some View {
-        Form {
-            Section {
-                HStack(spacing: 14) {
-                    AppLogo()
+        ZStack {
+            TechBackground()
 
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("CheatiOS DSW").font(.headline)
-                        Text(language.text("common.version", appVersion))
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
+            ScrollView {
+                VStack(spacing: 18) {
+                    profileCard
+                    deviceCard
+                    verifiedCard
                 }
-                .padding(.vertical, 4)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 16)
             }
+        }
+        .tint(AppTheme.neonCyan)
+        .navigationTitle(language.text("settings.title"))
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+    }
 
-            /* Tạm ẩn mục Ngôn ngữ
-            Section(language.text("settings.language")) {
-                Picker(language.text("settings.language"), selection: $languageCode) {
-                    ForEach(AppLanguage.allCases) { option in
-                        Text(option.displayName).tag(option.rawValue)
-                    }
+    private var profileCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 6) {
+                PulsingDot(color: AppTheme.neonLime, size: 6)
+                NeonReadout(text: "USER PROFILE", tint: AppTheme.neonLime)
+            }
+            HStack(spacing: 14) {
+                AppLogo()
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("CheatiOS DSW")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    Text(language.text("common.version", appVersion))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
+                Spacer()
             }
-            */
+        }
+        .padding(16)
+        .techCard(glow: AppTheme.neonCyan, opacity: 0.15)
+    }
 
-            Section(language.text("common.device")) {
-                LabeledContent(language.text("dashboard.hardware_model"), value: AppInfo.displayMachineName)
-                LabeledContent(language.text("settings.ios_version"), value: "\(AppInfo.osVersion) (\(AppInfo.osBuild))")
+    private var deviceCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            NeonSectionHeader(title: language.text("common.device").uppercased(), tint: AppTheme.neonCyan, symbol: "iphone.gen3")
+                .padding(.horizontal, 16)
+                .padding(.top, 14)
+                .padding(.bottom, 8)
+
+            VStack(spacing: 0) {
+                cyberRow(label: language.text("dashboard.hardware_model"), value: AppInfo.displayMachineName, accent: AppTheme.neonCyan)
+                cyberDivider()
+                cyberRow(
+                    label: language.text("settings.ios_version"),
+                    value: "\(AppInfo.osVersion) (\(AppInfo.osBuild))",
+                    accent: AppTheme.neonMagenta
+                )
             }
+            .padding(.bottom, 14)
+        }
+        .techCard(glow: AppTheme.neonCyan, opacity: 0.12)
+    }
 
-            Section {
+    private var verifiedCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            NeonSectionHeader(title: language.text("settings.verified_versions").uppercased(), tint: AppTheme.neonMagenta, symbol: "checkmark.shield.fill")
+                .padding(.horizontal, 16)
+                .padding(.top, 14)
+                .padding(.bottom, 8)
+
+            VStack(spacing: 0) {
                 HStack {
                     Text(language.text("settings.current_version"))
+                        .font(.subheadline)
+                        .foregroundStyle(.primary)
                     Spacer()
-                    Label(
-                        language.text(appState.isSupported ? "settings.supported" : "settings.unsupported"),
-                        systemImage: appState.isSupported ? "checkmark.circle.fill" : "xmark.circle.fill"
+                    HStack(spacing: 6) {
+                        PulsingDot(
+                            color: appState.isSupported ? AppTheme.neonLime : AppTheme.neonMagenta,
+                            size: 6
+                        )
+                        Text(language.text(appState.isSupported ? "settings.supported" : "settings.unsupported"))
+                            .font(.caption.weight(.bold))
+                            .tracking(1.0)
+                            .textCase(.uppercase)
+                            .foregroundStyle(appState.isSupported ? AppTheme.neonLime : AppTheme.neonMagenta)
+                    }
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .background(
+                        (appState.isSupported ? AppTheme.neonLime : AppTheme.neonMagenta).opacity(0.12),
+                        in: Capsule()
                     )
-                    .foregroundStyle(appState.isSupported ? Color.green : Color.red)
+                    .overlay(
+                        Capsule().strokeBorder(
+                            (appState.isSupported ? AppTheme.neonLime : AppTheme.neonMagenta).opacity(0.5),
+                            lineWidth: 1
+                        )
+                    )
                 }
-                LabeledContent("iOS 26", value: ExploitSupportPolicy.verifiedIOS26Range)
-                VStack(alignment: .leading, spacing: 8) {
+                .padding(.vertical, 10)
+
+                cyberDivider()
+
+                cyberRow(
+                    label: "iOS 26",
+                    value: ExploitSupportPolicy.verifiedIOS26Range,
+                    accent: AppTheme.neonCyan,
+                    monospace: true
+                )
+                cyberDivider()
+                VStack(alignment: .leading, spacing: 6) {
                     Text("iOS 27.0")
                         .font(.body)
+                        .foregroundStyle(.primary)
                     ForEach(ExploitSupportPolicy.verifiedIOS27Builds, id: \.build) { version in
                         Text(
                             language.text(
@@ -64,18 +135,48 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                     }
                 }
-                .padding(.vertical, 2)
-            } header: {
-                Text(language.text("settings.verified_versions"))
-            } footer: {
-                Text(language.text("settings.supported_versions_footer"))
+                .padding(.vertical, 8)
             }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 12)
+
+            Text(language.text("settings.supported_versions_footer"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 14)
         }
-        .scrollContentBackground(.hidden)
-        .background(TechBackground())
-        .tint(AppTheme.accent)
-        .navigationTitle(language.text("settings.title"))
-        .navigationBarTitleDisplayMode(.inline)
+        .techCard(glow: AppTheme.neonMagenta, opacity: 0.12)
+    }
+
+    private func cyberRow(label: String, value: String, accent: Color, monospace: Bool = false) -> some View {
+        HStack {
+            Text(label)
+                .font(.subheadline)
+                .foregroundStyle(.primary)
+            Spacer()
+            Text(value)
+                .font(monospace ? .subheadline.monospaced() : .subheadline.weight(.semibold))
+                .foregroundStyle(accent)
+                .shadow(color: accent.opacity(0.4), radius: 4)
+        }
+        .padding(.vertical, 10)
+    }
+
+    private func cyberDivider() -> some View {
+        Rectangle()
+            .fill(
+                LinearGradient(
+                    colors: [
+                        AppTheme.neonCyan.opacity(0.4),
+                        .clear,
+                        AppTheme.neonCyan.opacity(0.4),
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
+            .frame(height: 0.5)
     }
 
     private var appVersion: String {

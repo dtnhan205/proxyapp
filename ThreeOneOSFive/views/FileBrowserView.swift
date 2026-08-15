@@ -55,40 +55,52 @@ struct FileBrowserView: View {
     }
 
     var body: some View {
-        List {
-            Section {
-                ForEach(filteredEntries) { entry in
-                    fileRow(entry)
-                }
-            } header: {
-                Text(language.text("browser.items_count", Int64(filteredEntries.count)))
+        ZStack {
+            TechBackground()
+
+            List {
+                Section {
+                    ForEach(filteredEntries) { entry in
+                        fileRow(entry)
+                    }
+                } header: {
+                    HStack(spacing: 6) {
+                        Text(language.text("browser.items_count", Int64(filteredEntries.count)))
+                        Spacer()
+                        PulsingDot(color: AppTheme.neonCyan, size: 5)
+                    }
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .textCase(nil)
-            }
-        }
-        .listStyle(.plain)
-        .environment(\.defaultMinListRowHeight, 44)
-        .scrollDismissesKeyboard(.interactively)
-        .overlay {
-            Group {
-                switch overlayState {
-                case .loading:
-                    ProgressView(language.text("browser.loading"))
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                case .empty:
-                    fileEmptyView
-                case .noResults:
-                    searchEmptyView
-                case .none:
-                    EmptyView()
                 }
             }
-            .transition(.opacity)
-            .animation(interfaceAnimation, value: overlayState)
+            .listStyle(.plain)
+            .environment(\.defaultMinListRowHeight, 44)
+            .scrollContentBackground(.hidden)
+            .scrollDismissesKeyboard(.interactively)
+            .overlay {
+                Group {
+                    switch overlayState {
+                    case .loading:
+                        ProgressView(language.text("browser.loading"))
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .tint(AppTheme.neonCyan)
+                    case .empty:
+                        fileEmptyView
+                    case .noResults:
+                        searchEmptyView
+                    case .none:
+                        EmptyView()
+                    }
+                }
+                .transition(.opacity)
+                .animation(interfaceAnimation, value: overlayState)
+            }
         }
         .navigationTitle(currentPath == containerPath ? title : (currentPath as NSString).lastPathComponent)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .searchable(
             text: $fileSearchText,
             placement: .navigationBarDrawer(displayMode: .always),
@@ -118,6 +130,8 @@ struct FileBrowserView: View {
                     }
                 } label: {
                     Image(systemName: "plus")
+                        .foregroundStyle(AppTheme.neonCyan)
+                        .shadow(color: AppTheme.neonCyan.opacity(0.6), radius: 4)
                 }
                 .disabled(activityText != nil || importSession != nil)
                 .accessibilityLabel(language.text("browser.add"))
@@ -1008,22 +1022,33 @@ private struct FileEntryRow: View {
     }
 
     private var tint: Color {
-        if entry.isDirectory { return .blue }
+        if entry.isDirectory { return AppTheme.neonCyan }
         if ["jpg", "jpeg", "png", "gif", "heic", "webp"].contains(fileExtension) {
-            return .purple
+            return AppTheme.neonMagenta
         }
-        return AppTheme.accent
+        return AppTheme.neonCyan
     }
 
     var body: some View {
         HStack(spacing: 10) {
             ZStack {
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(tint.opacity(0.12))
+                    .fill(
+                        LinearGradient(
+                            colors: [tint.opacity(0.25), tint.opacity(0.08)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
                 Image(systemName: symbol)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(tint)
+                    .shadow(color: tint.opacity(0.5), radius: 4)
             }
+            .overlay(
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .strokeBorder(tint.opacity(0.4), lineWidth: 0.5)
+            )
             .frame(width: 30, height: 30)
             .accessibilityHidden(true)
 
@@ -1083,21 +1108,28 @@ struct FileReaderView: View {
     @State private var isLoading = true
 
     var body: some View {
-        Group {
-            if isLoading {
-                ProgressView()
-            } else {
-                ScrollView {
-                    Text(content)
-                        .font(.system(.caption, design: .monospaced))
-                        .textSelection(.enabled)
-                        .padding()
-                        .frame(maxWidth: .infinity, alignment: .leading)
+        ZStack {
+            TechBackground()
+            Group {
+                if isLoading {
+                    ProgressView()
+                        .tint(AppTheme.neonCyan)
+                } else {
+                    ScrollView {
+                        Text(content)
+                            .font(.system(.caption, design: .monospaced))
+                            .textSelection(.enabled)
+                            .padding()
+                            .foregroundStyle(AppTheme.neonCyan)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 }
             }
         }
         .navigationTitle(file.name)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .onAppear {
             DispatchQueue.global(qos: .userInitiated).async {
                 let c = ContainerStore.readTextFile(at: file.path)

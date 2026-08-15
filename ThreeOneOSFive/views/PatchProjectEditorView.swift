@@ -28,75 +28,82 @@ struct PatchProjectEditorView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section(language.text("patch.project")) {
-                    TextField(language.text("patch.project_name"), text: $name)
-                        .textInputAutocapitalization(.words)
-                }
-
-                Section {
-                    ForEach(rules) { rule in
-                        Button {
-                            ruleEditor = PatchRuleEditorContext(rule: rule)
-                        } label: {
-                            HStack(spacing: 10) {
-                                ruleRow(rule)
-                                Spacer(minLength: 8)
-                                Image(systemName: "chevron.right")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(.tertiary)
-                            }
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityHint(language.text("patch.edit_rule_hint"))
+            ZStack {
+                TechBackground()
+                Form {
+                    Section(language.text("patch.project")) {
+                        TextField(language.text("patch.project_name"), text: $name)
+                            .textInputAutocapitalization(.words)
                     }
-                    .onDelete { rules.remove(atOffsets: $0) }
 
-                    Button {
-                        ruleEditor = PatchRuleEditorContext(rule: nil)
-                    } label: {
-                        Label(language.text("patch.add_rule"), systemImage: "plus.circle.fill")
-                    }
-                } header: {
-                    Text(language.text("patch.rules"))
-                } footer: {
-                    Text(language.text("patch.bundle_path_footer"))
-                }
-
-                Section {
-                    if existingProject == nil {
-                        SecureField(language.text("patch.password_optional"), text: $password)
-                            .textContentType(.newPassword)
-                    } else {
-                        Label(
-                            language.text(passwordIsProtected ? "patch.password_locked" : "patch.no_password"),
-                            systemImage: passwordIsProtected ? "lock.fill" : "lock.open"
-                        )
-                    }
-                } header: {
-                    Text(language.text("patch.password"))
-                } footer: {
-                    Text(language.text(existingProject == nil
-                        ? "patch.password_immutable_footer"
-                        : "patch.password_existing_footer"))
-                }
-
-                if let validationMessageKey {
                     Section {
-                        Label(language.text(validationMessageKey), systemImage: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.red)
+                        ForEach(rules) { rule in
+                            Button {
+                                ruleEditor = PatchRuleEditorContext(rule: rule)
+                            } label: {
+                                HStack(spacing: 10) {
+                                    ruleRow(rule)
+                                    Spacer(minLength: 8)
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(AppTheme.neonCyan)
+                                }
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityHint(language.text("patch.edit_rule_hint"))
+                        }
+                        .onDelete { rules.remove(atOffsets: $0) }
+
+                        Button {
+                            ruleEditor = PatchRuleEditorContext(rule: nil)
+                        } label: {
+                            Label(language.text("patch.add_rule"), systemImage: "plus.circle.fill")
+                        }
+                    } header: {
+                        Text(language.text("patch.rules"))
+                    } footer: {
+                        Text(language.text("patch.bundle_path_footer"))
+                    }
+
+                    Section {
+                        if existingProject == nil {
+                            SecureField(language.text("patch.password_optional"), text: $password)
+                                .textContentType(.newPassword)
+                        } else {
+                            Label(
+                                language.text(passwordIsProtected ? "patch.password_locked" : "patch.no_password"),
+                                systemImage: passwordIsProtected ? "lock.fill" : "lock.open"
+                            )
+                        }
+                    } header: {
+                        Text(language.text("patch.password"))
+                    } footer: {
+                        Text(language.text(existingProject == nil
+                            ? "patch.password_immutable_footer"
+                            : "patch.password_existing_footer"))
+                    }
+
+                    if let validationMessageKey {
+                        Section {
+                            Label(language.text(validationMessageKey), systemImage: "exclamationmark.triangle.fill")
+                                .foregroundStyle(AppTheme.neonMagenta)
+                        }
                     }
                 }
+                .scrollContentBackground(.hidden)
             }
             .navigationTitle(language.text(existingProject == nil ? "patch.new" : "patch.edit"))
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(language.text("common.cancel")) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(language.text("common.done"), action: save)
+                        .foregroundStyle(AppTheme.neonCyan)
                 }
             }
             .sheet(item: $ruleEditor) { context in
@@ -123,11 +130,11 @@ struct PatchProjectEditorView: View {
             if rule.hasReplacement {
                 Text(rule.replacementFilename)
                     .font(.caption)
-                    .foregroundStyle(AppTheme.accent)
+                    .foregroundStyle(AppTheme.neonCyan)
             } else {
                 Label(language.text("patch.replacement_required"), systemImage: "exclamationmark.circle.fill")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(AppTheme.neonAmber)
             }
         }
         .padding(.vertical, 3)
@@ -201,137 +208,146 @@ struct PatchRuleEditorView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    TextField("com.example.app", text: $bundleID)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .font(.body.monospaced())
-                    TextField("Library/path/file", text: $relativePath)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .font(.body.monospaced())
-                } header: {
-                    Text(language.text("patch.destination"))
-                } footer: {
-                    Text(language.text("patch.bundle_not_uuid_footer"))
-                }
+            ZStack {
+                TechBackground()
+                Form {
+                    Section {
+                        TextField("com.example.app", text: $bundleID)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .font(.body.monospaced())
+                        TextField("Library/path/file", text: $relativePath)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .font(.body.monospaced())
+                    } header: {
+                        Text(language.text("patch.destination"))
+                    } footer: {
+                        Text(language.text("patch.bundle_not_uuid_footer"))
+                    }
 
-                Section(language.text("patch.replacement_file")) {
-                    Button {
-                        showFileImporter = true
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: replacementFilename.isEmpty ? "doc.badge.plus" : "doc.fill")
-                                .foregroundStyle(AppTheme.accent)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(replacementFilename.isEmpty
-                                     ? language.text("patch.choose_file")
-                                     : replacementFilename)
-                                    .foregroundStyle(.primary)
-                                    .lineLimit(1)
-                                Text(language.text(replacementFilename.isEmpty
-                                     ? "patch.replacement_required"
-                                     : "patch.change_replacement"))
-                                    .font(.caption)
-                                    .foregroundStyle(replacementFilename.isEmpty ? Color.orange : Color.secondary)
+                    Section(language.text("patch.replacement_file")) {
+                        Button {
+                            showFileImporter = true
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: replacementFilename.isEmpty ? "doc.badge.plus" : "doc.fill")
+                                    .foregroundStyle(AppTheme.neonCyan)
+                                    .shadow(color: AppTheme.neonCyan.opacity(0.5), radius: 4)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(replacementFilename.isEmpty
+                                         ? language.text("patch.choose_file")
+                                         : replacementFilename)
+                                        .foregroundStyle(.primary)
+                                        .lineLimit(1)
+                                    Text(language.text(replacementFilename.isEmpty
+                                         ? "patch.replacement_required"
+                                         : "patch.change_replacement"))
+                                        .font(.caption)
+                                        .foregroundStyle(replacementFilename.isEmpty ? AppTheme.neonAmber : Color.secondary)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(AppTheme.neonCyan)
                             }
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.tertiary)
+                            .contentShape(Rectangle())
                         }
-                        .contentShape(Rectangle())
-                    }
-                    .disabled(isImporting)
-                    if isImporting {
-                        HStack(spacing: 10) {
-                            ProgressView()
-                            Text(language.text("patch.importing_replacement"))
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    if !replacementFilename.isEmpty {
-                        LabeledContent(
-                            language.text("patch.file_size"),
-                            value: ByteCountFormatter.string(
-                                fromByteCount: Int64(replacementData.count),
-                                countStyle: .file
-                            )
-                        )
-                    }
-                }
-
-                Section {
-                    Button {
-                        showOriginalFileImporter = true
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: originalData == nil ? "doc.badge.plus" : "doc.fill")
-                                .foregroundStyle(AppTheme.accent)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(originalData == nil
-                                     ? language.text("patch.choose_file")
-                                     : language.text("patch.original_file_chosen"))
-                                    .foregroundStyle(.primary)
-                                Text(language.text(originalData == nil
-                                     ? "patch.original_file_none"
-                                     : "patch.change_original"))
-                                    .font(.caption)
+                        .disabled(isImporting)
+                        if isImporting {
+                            HStack(spacing: 10) {
+                                ProgressView().tint(AppTheme.neonCyan)
+                                Text(language.text("patch.importing_replacement"))
+                                    .font(.subheadline)
                                     .foregroundStyle(.secondary)
                             }
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.tertiary)
                         }
-                        .contentShape(Rectangle())
-                    }
-                    .disabled(isImportingOriginal)
-                    if isImportingOriginal {
-                        HStack(spacing: 10) {
-                            ProgressView()
-                            Text(language.text("patch.importing_original"))
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    if let originalData {
-                        LabeledContent(
-                            language.text("patch.file_size"),
-                            value: ByteCountFormatter.string(
-                                fromByteCount: Int64(originalData.count),
-                                countStyle: .file
+                        if !replacementFilename.isEmpty {
+                            LabeledContent(
+                                language.text("patch.file_size"),
+                                value: ByteCountFormatter.string(
+                                    fromByteCount: Int64(replacementData.count),
+                                    countStyle: .file
+                                )
                             )
-                        )
-                        Button(role: .destructive) {
-                            self.originalData = nil
-                        } label: {
-                            Text(language.text("patch.remove_original_file"))
                         }
                     }
-                } header: {
-                    Text(language.text("patch.original_file"))
-                } footer: {
-                    Text(language.text("patch.original_file_footer"))
-                }
 
-                if let validationMessageKey {
                     Section {
-                        Label(language.text(validationMessageKey), systemImage: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.red)
+                        Button {
+                            showOriginalFileImporter = true
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: originalData == nil ? "doc.badge.plus" : "doc.fill")
+                                    .foregroundStyle(AppTheme.neonCyan)
+                                    .shadow(color: AppTheme.neonCyan.opacity(0.5), radius: 4)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(originalData == nil
+                                         ? language.text("patch.choose_file")
+                                         : language.text("patch.original_file_chosen"))
+                                        .foregroundStyle(.primary)
+                                    Text(language.text(originalData == nil
+                                         ? "patch.original_file_none"
+                                         : "patch.change_original"))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(AppTheme.neonCyan)
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .disabled(isImportingOriginal)
+                        if isImportingOriginal {
+                            HStack(spacing: 10) {
+                                ProgressView().tint(AppTheme.neonCyan)
+                                Text(language.text("patch.importing_original"))
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        if let originalData {
+                            LabeledContent(
+                                language.text("patch.file_size"),
+                                value: ByteCountFormatter.string(
+                                    fromByteCount: Int64(originalData.count),
+                                    countStyle: .file
+                                )
+                            )
+                            Button(role: .destructive) {
+                                self.originalData = nil
+                            } label: {
+                                Text(language.text("patch.remove_original_file"))
+                            }
+                        }
+                    } header: {
+                        Text(language.text("patch.original_file"))
+                    } footer: {
+                        Text(language.text("patch.original_file_footer"))
+                    }
+
+                    if let validationMessageKey {
+                        Section {
+                            Label(language.text(validationMessageKey), systemImage: "exclamationmark.triangle.fill")
+                                .foregroundStyle(AppTheme.neonMagenta)
+                        }
                     }
                 }
+                .scrollContentBackground(.hidden)
             }
             .navigationTitle(language.text(originalRule == nil ? "patch.add_rule" : "patch.edit_rule"))
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(language.text("common.cancel")) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(language.text("common.done"), action: save)
+                        .foregroundStyle(AppTheme.neonCyan)
                         .disabled(isImporting || isImportingOriginal)
                 }
             }

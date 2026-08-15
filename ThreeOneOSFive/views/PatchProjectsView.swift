@@ -23,21 +23,30 @@ struct PatchProjectsView: View {
     }
 
     var body: some View {
-        List {
-            if store.items.isEmpty && !store.isBusy {
-                emptyState
-                    .listRowSeparator(.hidden)
-            } else {
-                ForEach(store.items) { item in
-                    itemRow(item)
-                }
-                .onDelete { offsets in
-                    offsets.map { store.items[$0] }.forEach(store.delete)
+        ZStack {
+            TechBackground()
+
+            List {
+                if store.items.isEmpty && !store.isBusy {
+                    emptyState
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets())
+                } else {
+                    ForEach(store.items) { item in
+                        itemRow(item)
+                            .listRowBackground(AppTheme.techCardFill)
+                            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                    }
+                    .onDelete { offsets in
+                        offsets.map { store.items[$0] }.forEach(store.delete)
+                    }
                 }
             }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .refreshable { store.reload() }
         }
-        .listStyle(.plain)
-        .refreshable { store.reload() }
         .navigationTitle(language.text("patch.title"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -56,14 +65,19 @@ struct PatchProjectsView: View {
                 } label: {
                     if store.isBusy {
                         ProgressView()
+                            .tint(AppTheme.neonCyan)
                     } else {
                         Image(systemName: "plus")
+                            .foregroundStyle(AppTheme.neonCyan)
+                            .shadow(color: AppTheme.neonCyan.opacity(0.6), radius: 4)
                     }
                 }
                 .disabled(store.isBusy)
                 .accessibilityLabel(language.text("patch.add"))
             }
         }
+        .toolbarBackground(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .sheet(isPresented: $showImporter) {
             FileDocumentPicker(
                 allowedContentTypes: PatchPackagePickerPolicy.allowedContentTypes,
@@ -118,10 +132,15 @@ struct PatchProjectsView: View {
     }
 
     private var emptyState: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 14) {
+            HStack(spacing: 6) {
+                PulsingDot(color: AppTheme.neonCyan, size: 6)
+                NeonReadout(text: "NO PROJECTS", tint: AppTheme.neonCyan)
+            }
             Image(systemName: "shippingbox")
                 .font(.system(size: 38, weight: .light))
-                .foregroundStyle(AppTheme.accent)
+                .foregroundStyle(AppTheme.neonCyan)
+                .shadow(color: AppTheme.neonCyan.opacity(0.5), radius: 8)
             Text(language.text("patch.empty_title"))
                 .font(.headline)
             Text(language.text("patch.empty_message"))
@@ -129,7 +148,8 @@ struct PatchProjectsView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
             Button(language.text("patch.new")) { showCreate = true }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.plain)
+                .neonTint(AppTheme.neonCyan)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 64)
@@ -144,9 +164,23 @@ struct PatchProjectRow: View {
         HStack(spacing: 12) {
             Image(systemName: item.isLocked ? "lock.doc.fill" : "shippingbox.fill")
                 .font(.title3)
-                .foregroundStyle(AppTheme.accent)
+                .foregroundStyle(AppTheme.neonCyan)
                 .frame(width: 34, height: 34)
-                .background(AppTheme.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 9))
+                .background(
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [AppTheme.neonCyan.opacity(0.22), AppTheme.neonCyan.opacity(0.06)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .strokeBorder(AppTheme.neonCyan.opacity(0.45), lineWidth: 1)
+                )
+                .shadow(color: AppTheme.neonCyan.opacity(0.4), radius: 6)
             VStack(alignment: .leading, spacing: 3) {
                 Text(item.project?.name ?? language.text("patch.locked_project"))
                     .font(.body.weight(.semibold))
@@ -161,11 +195,13 @@ struct PatchProjectRow: View {
             if item.summary.isPasswordProtected {
                 Image(systemName: "key.fill")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppTheme.neonAmber)
+                    .shadow(color: AppTheme.neonAmber.opacity(0.5), radius: 4)
                     .accessibilityLabel(language.text("patch.password_protected"))
             }
         }
         .padding(.vertical, 4)
+        .listRowBackground(AppTheme.techCardFill)
     }
 }
 
@@ -177,15 +213,19 @@ struct PatchUnlockView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    SecureField(language.text("patch.password"), text: $password)
-                        .textContentType(.password)
-                        .submitLabel(.done)
-                        .onSubmit(unlock)
-                } footer: {
-                    Text(language.text("patch.password_once_message"))
+            ZStack {
+                TechBackground()
+                Form {
+                    Section {
+                        SecureField(language.text("patch.password"), text: $password)
+                            .textContentType(.password)
+                            .submitLabel(.done)
+                            .onSubmit(unlock)
+                    } footer: {
+                        Text(language.text("patch.password_once_message"))
+                    }
                 }
+                .scrollContentBackground(.hidden)
             }
             .navigationTitle(language.text("patch.unlock"))
             .navigationBarTitleDisplayMode(.inline)
@@ -230,27 +270,41 @@ struct PatchProjectDetailView: View {
     }
 
     var body: some View {
-        List {
-            if let item, let project = item.project {
-                Section {
-                    ForEach(project.rules) { rule in
-                        ruleToggleRow(rule)
+        ZStack {
+            TechBackground()
+
+            List {
+                if let item, let project = item.project {
+                    Section {
+                        ForEach(Array(project.rules.enumerated()), id: \.element.id) { index, rule in
+                            ruleToggleRow(rule, colorIndex: index)
+                        }
+                    } header: {
+                        NeonSectionHeader(
+                            title: language.text("patch.rules").uppercased(),
+                            tint: AppTheme.neonCyan,
+                            symbol: "bolt.fill"
+                        )
+                        .textCase(nil)
+                    } footer: {
+                        Text(language.text("patch.toggle_footer"))
+                            .foregroundStyle(.secondary)
                     }
-                } header: {
-                    Text(language.text("patch.rules"))
-                } footer: {
-                    Text(language.text("patch.toggle_footer"))
                 }
             }
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
         }
-        .scrollContentBackground(.hidden)
-        .background(TechBackground())
         .navigationTitle(item?.project?.name ?? language.text("patch.title"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 if isWorking {
-                    ProgressView()
+                    HStack(spacing: 6) {
+                        PulsingDot(color: AppTheme.neonCyan, size: 6)
+                        ProgressView()
+                            .tint(AppTheme.neonCyan)
+                    }
                 } else if let item {
                     Menu {
                         Button {
@@ -275,10 +329,14 @@ struct PatchProjectDetailView: View {
                         }
                     } label: {
                         Image(systemName: "ellipsis.circle")
+                            .foregroundStyle(AppTheme.neonCyan)
+                            .shadow(color: AppTheme.neonCyan.opacity(0.5), radius: 4)
                     }
                 }
             }
         }
+        .toolbarBackground(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .task { await loadInitialStates() }
         .sheet(isPresented: $showEditor) {
             if let item, let project = item.project {
@@ -323,8 +381,9 @@ struct PatchProjectDetailView: View {
         .toast($toast)
     }
 
-    private func ruleToggleRow(_ rule: PatchRule) -> some View {
-        HStack(spacing: 12) {
+    private func ruleToggleRow(_ rule: PatchRule, colorIndex: Int) -> some View {
+        let tint = AppTheme.rowColor(colorIndex)
+        return HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(rule.replacementFilename.isEmpty ? rule.bundleID : rule.replacementFilename)
                     .font(.body.weight(.semibold))
@@ -336,15 +395,17 @@ struct PatchProjectDetailView: View {
                 if !rule.canToggle {
                     Text(language.text("patch.toggle_unavailable"))
                         .font(.caption2)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(AppTheme.neonAmber)
                 }
             }
             Spacer(minLength: 8)
             if togglingRuleID == rule.id {
                 ProgressView()
+                    .tint(tint)
             } else {
                 Toggle("", isOn: toggleBinding(for: rule))
                     .labelsHidden()
+                    .neonTint(tint)
                     .disabled(!rule.canToggle)
             }
         }

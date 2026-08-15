@@ -33,7 +33,10 @@ struct AppDataBrowserView: View {
 
     var body: some View {
         NavigationStack {
-            appList
+            ZStack {
+                TechBackground()
+                appList
+            }
             .navigationTitle(language.text("browser.title"))
             .navigationBarTitleDisplayMode(.inline)
             .searchable(
@@ -45,15 +48,22 @@ struct AppDataBrowserView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button { reload() } label: {
                         if isResolving {
-                            ProgressView()
+                            HStack(spacing: 6) {
+                                PulsingDot(color: AppTheme.neonCyan, size: 6)
+                                ProgressView().tint(AppTheme.neonCyan)
+                            }
                         } else {
                             Image(systemName: "arrow.clockwise")
+                                .foregroundStyle(AppTheme.neonCyan)
+                                .shadow(color: AppTheme.neonCyan.opacity(0.6), radius: 4)
                         }
                     }
                     .disabled(isResolving)
                     .accessibilityLabel(language.text("browser.retry"))
                 }
             }
+            .toolbarBackground(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .onAppear {
                 if !hasLoaded {
                     hasLoaded = true
@@ -86,9 +96,10 @@ struct AppDataBrowserView: View {
                     Text(language.text("browser.apps_count", Int64(filteredApps.count)))
                     Spacer()
                     if isResolving {
-                        ProgressView()
-                            .controlSize(.mini)
-                        Text(language.text("browser.mha_scanning"))
+                        HStack(spacing: 6) {
+                            PulsingDot(color: AppTheme.neonCyan, size: 5)
+                            Text(language.text("browser.mha_scanning"))
+                        }
                     }
                 }
                 .font(.caption)
@@ -98,6 +109,7 @@ struct AppDataBrowserView: View {
         }
         .listStyle(.plain)
         .environment(\.defaultMinListRowHeight, 48)
+        .scrollContentBackground(.hidden)
         .scrollDismissesKeyboard(.interactively)
         .overlay {
             Group {
@@ -105,6 +117,7 @@ struct AppDataBrowserView: View {
                 case .loading:
                     ProgressView(language.text("browser.loading"))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .tint(AppTheme.neonCyan)
                 case .empty:
                     emptyView
                 case .noResults:
@@ -149,14 +162,16 @@ struct AppDataBrowserView: View {
         VStack(spacing: 16) {
             Image(systemName: "folder.badge.questionmark")
                 .font(.system(size: 48))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AppTheme.neonCyan)
+                .shadow(color: AppTheme.neonCyan.opacity(0.5), radius: 8)
             Text(errorMessage ?? language.text("browser.empty"))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding()
             Button(language.text("browser.retry")) { reload() }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.plain)
+                .neonTint(AppTheme.neonCyan)
         }
         .padding()
     }
@@ -313,13 +328,27 @@ struct BrowserAppIcon: View {
                     .resizable()
                     .scaledToFill()
             } else {
-                Image(systemName: "app")
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [AppTheme.neonCyan.opacity(0.25), AppTheme.neonMagenta.opacity(0.15)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                    Image(systemName: "app")
+                        .font(.title3)
+                        .foregroundStyle(AppTheme.neonCyan)
+                }
             }
         }
         .frame(width: 36, height: 36)
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(AppTheme.neonCyan.opacity(0.4), lineWidth: 0.5)
+        )
         .accessibilityHidden(true)
         .onAppear {
             guard resolvedIcon == nil, !didRequestIcon else { return }

@@ -7,6 +7,7 @@ struct GamesHomeView: View {
     @StateObject private var store = PatchProjectStore()
     @State private var games: [RemoteGameSummary] = []
     @State private var isLoadingGames = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let columns = [GridItem(.adaptive(minimum: 150), spacing: 14)]
 
@@ -21,22 +22,24 @@ struct GamesHomeView: View {
                         .padding(.top, 12)
 
                     LazyVGrid(columns: columns, spacing: 14) {
-                        ForEach(games) { game in
+                        ForEach(Array(games.enumerated()), id: \.element.id) { index, game in
                             NavigationLink {
                                 GamePatchesView(game: game, store: store)
                             } label: {
                                 GameCardView(
                                     title: game.name,
                                     subtitle: game.bundleID.isEmpty ? " " : game.bundleID,
-                                    bannerColor: Color(hex: game.bannerColor) ?? AppTheme.accent,
+                                    bannerColor: Color(hex: game.bannerColor) ?? AppTheme.neonCyan,
                                     iconURL: game.iconURL,
-                                    systemIconName: "app.fill"
+                                    systemIconName: "app.fill",
+                                    accent: AppTheme.rowColor(index)
                                 )
                             }
                             .buttonStyle(.plain)
                         }
                     }
                     .padding(16)
+                    .animation(.easeOut(duration: 0.3), value: games)
 
                     if games.isEmpty && !isLoadingGames {
                         Text(language.text("patch.no_games_yet"))
@@ -51,15 +54,25 @@ struct GamesHomeView: View {
             .navigationTitle(language.text("tab.home"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    HStack(spacing: 4) {
+                        PulsingDot(color: AppTheme.neonLime, size: 6)
+                        NeonReadout(text: "ONLINE", tint: AppTheme.neonLime)
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     NavigationLink {
                         SettingsView()
                     } label: {
                         Image(systemName: "gearshape")
+                            .foregroundStyle(AppTheme.neonCyan)
+                            .shadow(color: AppTheme.neonCyan.opacity(0.6), radius: 4)
                     }
                     .accessibilityLabel(language.text("tab.settings"))
                 }
             }
+            .toolbarBackground(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .refreshable { await loadGames() }
             .task { await loadGames() }
             .sheet(item: $draftCoordinator.request) { request in
@@ -73,7 +86,7 @@ struct GamesHomeView: View {
                 }
             }
         }
-        .tint(AppTheme.accent)
+        .tint(AppTheme.neonCyan)
         .preferredColorScheme(.dark)
     }
 
@@ -86,13 +99,17 @@ struct GamesHomeView: View {
     }
 
     private var deviceInfoCard: some View {
-        VStack(spacing: 12) {
-            deviceInfoRow(icon: "apple.logo", iconColor: .purple, label: "iOS", value: shortOSVersion)
-            deviceInfoRow(icon: "iphone", iconColor: AppTheme.techGlow, label: language.text("common.device"), value: AppInfo.hardwareDisplayName)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                PulsingDot(color: AppTheme.neonCyan, size: 6)
+                NeonReadout(text: "DEVICE STATUS", tint: AppTheme.neonCyan)
+            }
+            deviceInfoRow(icon: "apple.logo", iconColor: AppTheme.neonMagenta, label: "iOS", value: shortOSVersion)
+            deviceInfoRow(icon: "iphone", iconColor: AppTheme.neonCyan, label: language.text("common.device"), value: AppInfo.hardwareDisplayName)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
-        .techCard()
+        .techCard(glow: AppTheme.neonCyan, opacity: 0.15)
     }
 
     private func deviceInfoRow(icon: String, iconColor: Color, label: String, value: String) -> some View {
@@ -101,6 +118,7 @@ struct GamesHomeView: View {
                 .font(.subheadline)
                 .foregroundStyle(iconColor)
                 .frame(width: 18)
+                .shadow(color: iconColor.opacity(0.6), radius: 4)
             Text(label)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -127,19 +145,47 @@ struct GameCardView: View {
     let bannerColor: Color
     let iconURL: URL?
     let systemIconName: String
+    let accent: Color
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var glowPhase: Double = 0
+    @State private var isPressed = false
 
     var body: some View {
         VStack(spacing: 0) {
             ZStack {
-                bannerColor
+                LinearGradient(
+                    colors: [
+                        bannerColor,
+                        bannerColor.opacity(0.6),
+                        Color.black.opacity(0.4),
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                // Animated sheen across the banner.
+                if !reduceMotion {
+                    LinearGradient(
+                        colors: [
+                            .clear,
+                            Color.white.opacity(0.25),
+                            .clear,
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .rotationEffect(.degrees(20))
+                    .offset(x: glowPhase * 200 - 100)
+                    .blendMode(.overlay)
+                }
                 iconView
                     .frame(width: 56, height: 56)
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .overlay(
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .strokeBorder(Color.white.opacity(0.28), lineWidth: 1)
+                            .strokeBorder(Color.white.opacity(0.35), lineWidth: 1)
                     )
-                    .shadow(color: .black.opacity(0.3), radius: 10, y: 6)
+                    .shadow(color: .black.opacity(0.4), radius: 10, y: 6)
             }
             .frame(height: 88)
 
@@ -161,9 +207,37 @@ struct GameCardView: View {
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(AppTheme.techCardStroke, lineWidth: 1)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [
+                            accent.opacity(0.6),
+                            accent.opacity(0.15),
+                            accent.opacity(0.6),
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
         )
-        .shadow(color: AppTheme.techGlow.opacity(0.10), radius: 10, y: 0)
+        .shadow(color: accent.opacity(isPressed ? 0.55 : 0.25), radius: isPressed ? 14 : 10)
+        .scaleEffect(isPressed ? 0.97 : 1.0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in
+                    if !isPressed { isPressed = true }
+                }
+                .onEnded { _ in
+                    isPressed = false
+                }
+        )
+        .onAppear {
+            guard !reduceMotion else { return }
+            withAnimation(.linear(duration: 3.5).repeatForever(autoreverses: false)) {
+                glowPhase = 1.0
+            }
+        }
     }
 
     @ViewBuilder

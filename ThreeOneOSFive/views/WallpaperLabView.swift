@@ -29,14 +29,20 @@ struct WallpaperLabView: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                accessSection
-                packagesSection
-                if !activeReceipts.isEmpty { resetSection }
+            ZStack {
+                TechBackground()
+                List {
+                    accessSection
+                    packagesSection
+                    if !activeReceipts.isEmpty { resetSection }
+                }
+                .listStyle(.insetGrouped)
+                .scrollContentBackground(.hidden)
             }
-            .listStyle(.insetGrouped)
             .navigationTitle(language.text("wallpaper.title"))
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar { toolbarContent }
             .overlay { busyOverlay }
             .alert(item: $alert, content: alertContent)
@@ -76,11 +82,11 @@ struct WallpaperLabView: View {
                             ? "checkmark.shield.fill"
                             : "exclamationmark.triangle.fill"
                     )
-                    .foregroundStyle(report.canInstall ? Color.green : Color.orange)
+                    .foregroundStyle(report.canInstall ? AppTheme.neonLime : AppTheme.neonAmber)
                     Spacer()
                     Text("MHA-C2")
                         .font(.caption.monospaced())
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(AppTheme.neonCyan)
                 }
                 Text(
                     language.text(
@@ -94,11 +100,11 @@ struct WallpaperLabView: View {
                 .foregroundStyle(.secondary)
             } else if let accessError {
                 Label(accessError, systemImage: "xmark.shield.fill")
-                    .foregroundStyle(.red)
+                    .foregroundStyle(AppTheme.neonMagenta)
                 Button(language.text("wallpaper.try_again")) { checkAccess() }
             } else {
                 HStack(spacing: 10) {
-                    ProgressView()
+                    ProgressView().tint(AppTheme.neonCyan)
                     Text(language.text("wallpaper.checking"))
                 }
             }
@@ -111,7 +117,8 @@ struct WallpaperLabView: View {
                 VStack(spacing: 10) {
                     Image(systemName: "photo.badge.plus")
                         .font(.system(size: 34, weight: .light))
-                        .foregroundStyle(AppTheme.accent)
+                        .foregroundStyle(AppTheme.neonCyan)
+                        .shadow(color: AppTheme.neonCyan.opacity(0.5), radius: 6)
                     Text(language.text("wallpaper.empty_packages"))
                         .font(.headline)
                     Text(language.text("wallpaper.empty_packages_message"))
@@ -119,7 +126,8 @@ struct WallpaperLabView: View {
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                     Button(language.text("wallpaper.import")) { showImporter = true }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.plain)
+                        .neonTint(AppTheme.neonCyan)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 20)
@@ -148,11 +156,20 @@ struct WallpaperLabView: View {
         HStack(spacing: 12) {
             Image(systemName: "photo.on.rectangle.angled")
                 .font(.title3)
-                .foregroundStyle(AppTheme.accent)
+                .foregroundStyle(AppTheme.neonCyan)
+                .shadow(color: AppTheme.neonCyan.opacity(0.5), radius: 4)
                 .frame(width: 36, height: 36)
                 .background(
-                    AppTheme.accent.opacity(0.12),
+                    LinearGradient(
+                        colors: [AppTheme.neonCyan.opacity(0.25), AppTheme.neonCyan.opacity(0.08)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
                     in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(AppTheme.neonCyan.opacity(0.45), lineWidth: 1)
                 )
             VStack(alignment: .leading, spacing: 3) {
                 Text(package.displayName)
@@ -176,7 +193,11 @@ struct WallpaperLabView: View {
             )
             .font(.title3)
             .foregroundStyle(
-                selectedPackageID == package.id ? AppTheme.accent : Color.secondary
+                selectedPackageID == package.id ? AppTheme.neonCyan : Color.secondary
+            )
+            .shadow(
+                color: selectedPackageID == package.id ? AppTheme.neonCyan.opacity(0.6) : .clear,
+                radius: 6
             )
         }
         .contentShape(Rectangle())
@@ -203,6 +224,7 @@ struct WallpaperLabView: View {
         ToolbarItem(placement: .navigationBarLeading) {
             Button { checkAccess() } label: {
                 Image(systemName: "arrow.clockwise")
+                    .foregroundStyle(AppTheme.neonCyan)
             }
             .disabled(isBusy)
             .accessibilityLabel(language.text("wallpaper.try_again"))
@@ -210,6 +232,8 @@ struct WallpaperLabView: View {
         ToolbarItem(placement: .navigationBarTrailing) {
             Button { showImporter = true } label: {
                 Image(systemName: "plus")
+                    .foregroundStyle(AppTheme.neonCyan)
+                    .shadow(color: AppTheme.neonCyan.opacity(0.6), radius: 4)
             }
             .disabled(isBusy)
             .accessibilityLabel(language.text("wallpaper.import"))
@@ -226,7 +250,8 @@ struct WallpaperLabView: View {
                 .fontWeight(.semibold)
                 .frame(maxWidth: .infinity, minHeight: 44)
         }
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(.plain)
+        .neonTint(AppTheme.neonCyan)
         .disabled(selectedPackage == nil || report?.canInstall != true || isBusy)
         .padding(.vertical, 4)
     }

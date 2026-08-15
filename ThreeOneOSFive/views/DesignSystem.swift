@@ -1,32 +1,46 @@
 import SwiftUI
 
+// MARK: - Cyberpunk Neon Palette
 enum AppTheme {
-    static let accent = Color(
-        uiColor: UIColor { traits in
-            traits.userInterfaceStyle == .dark
-                ? UIColor(red: 1.00, green: 0.64, blue: 0.42, alpha: 1.00)
-                : UIColor(red: 0.85, green: 0.42, blue: 0.20, alpha: 1.00)
-        }
-    )
-    static let pageBackground = Color(uiColor: .systemBackground)
-    static let consoleBackground = Color(uiColor: .secondarySystemBackground)
+    /// Primary accent: electric cyan, the dominant neon of the cyberpunk palette.
+    static let neonCyan = Color(red: 0.00, green: 0.95, blue: 1.00)
+    /// Slightly cooler cyan used for backlights and borders.
+    static let neonIce = Color(red: 0.55, green: 1.00, blue: 1.00)
+    /// Hot magenta accent for highlights, errors and active toggles.
+    static let neonMagenta = Color(red: 1.00, green: 0.10, blue: 0.65)
+    /// Acid lime accent for "success" or "running" indicators.
+    static let neonLime = Color(red: 0.65, green: 1.00, blue: 0.20)
+    /// Warm neon amber, used as legacy accent on the few places we still highlight non-toggle rows.
+    static let neonAmber = Color(red: 1.00, green: 0.78, blue: 0.20)
+    /// Deep violet used as a tertiary accent (rare).
+    static let neonViolet = Color(red: 0.55, green: 0.30, blue: 1.00)
+
+    /// Background anchor used by `.preferredColorScheme(.dark)` callers — kept for legacy code.
+    static let accent = neonCyan
+    static let pageBackground = Color(red: 0.02, green: 0.04, blue: 0.08)
+    static let consoleBackground = Color(red: 0.04, green: 0.07, blue: 0.12)
     static let pageInset: CGFloat = 16
 
-    // MARK: - Tech theme (Home / per-game menu screens)
-    static let techBackgroundTop = Color(red: 0.05, green: 0.07, blue: 0.12)
-    static let techBackgroundBottom = Color(red: 0.01, green: 0.02, blue: 0.05)
-    static let techGlow = Color(red: 0.32, green: 0.86, blue: 0.95)
-    static let techCardFill = Color.white.opacity(0.045)
-    static let techCardStroke = Color(red: 0.32, green: 0.86, blue: 0.95).opacity(0.30)
+    // MARK: - Cyberpunk backdrop gradient (Home / per-game menu screens)
+    static let techBackgroundTop = Color(red: 0.03, green: 0.06, blue: 0.12)
+    static let techBackgroundMid = Color(red: 0.01, green: 0.02, blue: 0.06)
+    static let techBackgroundBottom = Color(red: 0.00, green: 0.00, blue: 0.03)
 
-    /// Cycled per-row accent so a menu card's items read as distinct switches at a glance,
-    /// matching the reference "PROXY MOD MENU" style where each toggle has its own icon color.
+    /// Glow that sits behind cards to make them feel like floating holograms.
+    static let techGlow = neonCyan
+    /// Card fill — a translucent slate-blue, slightly cooler than the background.
+    static let techCardFill = Color.white.opacity(0.04)
+    /// Card border — a dim neon line that lights up on focus.
+    static let techCardStroke = neonCyan.opacity(0.35)
+
+    /// Per-row accent cycled across list items so each toggle has its own neon color, like the
+    /// "PROXY MOD MENU" reference design.
     static let rowPalette: [Color] = [
-        Color(red: 1.00, green: 0.56, blue: 0.24),
-        Color(red: 0.96, green: 0.28, blue: 0.42),
-        Color(red: 0.30, green: 0.78, blue: 0.96),
-        Color(red: 0.66, green: 0.46, blue: 0.98),
-        Color(red: 0.36, green: 0.85, blue: 0.56),
+        neonAmber,
+        neonMagenta,
+        neonCyan,
+        neonViolet,
+        neonLime,
     ]
 
     static func rowColor(_ index: Int) -> Color {
@@ -34,32 +48,92 @@ enum AppTheme {
     }
 }
 
-/// A dark, faintly gridded backdrop used behind the Home and per-game menu screens to give the
-/// app a "tech tool" look consistent with the reference designs, instead of the plain system
-/// background.
+// MARK: - Cyberpunk Backdrop
+
+/// The animated cyberpunk backdrop. A vertical gradient sits below a scrolling grid pattern and
+/// a slowly pulsing magenta/cyan radial glow. A horizontal scanline bar drifts down forever,
+/// giving the surface a CRT/hologram feel.
 struct TechBackground: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var scanlineY: CGFloat = -0.25
+    @State private var glowPhase: Double = 0
+
     var body: some View {
         ZStack {
+            // Base vertical gradient
             LinearGradient(
-                colors: [AppTheme.techBackgroundTop, AppTheme.techBackgroundBottom],
+                colors: [
+                    AppTheme.techBackgroundTop,
+                    AppTheme.techBackgroundMid,
+                    AppTheme.techBackgroundBottom,
+                ],
                 startPoint: .top,
                 endPoint: .bottom
             )
+
+            // Grid pattern
             TechGridPattern()
-                .stroke(Color.white.opacity(0.035), lineWidth: 1)
+                .stroke(AppTheme.neonCyan.opacity(0.06), lineWidth: 1)
+
+            // Diagonal accent lines, animated to drift sideways slowly.
+            TechDiagonalLines()
+                .stroke(AppTheme.neonMagenta.opacity(0.05), lineWidth: 1)
+                .blur(radius: 0.5)
+
+            // Pulsing radial glow at the top, mixing cyan and magenta.
             RadialGradient(
-                colors: [AppTheme.techGlow.opacity(0.10), .clear],
+                colors: [
+                    AppTheme.neonCyan.opacity(0.20),
+                    AppTheme.neonMagenta.opacity(0.06),
+                    .clear,
+                ],
                 center: .top,
                 startRadius: 0,
-                endRadius: 420
+                endRadius: 520
             )
+            .opacity(reduceMotion ? 1.0 : (0.85 + 0.15 * sin(glowPhase)))
+            .blendMode(.screen)
+
+            // Drifting scanline that travels down the screen continuously.
+            GeometryReader { geo in
+                ScanlineBar()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                .clear,
+                                AppTheme.neonCyan.opacity(0.18),
+                                AppTheme.neonIce.opacity(0.35),
+                                AppTheme.neonCyan.opacity(0.18),
+                                .clear,
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .frame(height: 90)
+                    .offset(y: scanlineY * geo.size.height)
+                    .blendMode(.screen)
+            }
+
+            // Fine horizontal scanline overlay (CRT texture) — kept static for performance.
+            TechScanlineOverlay()
+                .fill(Color.white.opacity(0.02))
         }
         .ignoresSafeArea()
+        .onAppear {
+            guard !reduceMotion else { return }
+            withAnimation(.linear(duration: 7.5).repeatForever(autoreverses: false)) {
+                scanlineY = 1.25
+            }
+            withAnimation(.easeInOut(duration: 4.0).repeatForever(autoreverses: true)) {
+                glowPhase = .pi
+            }
+        }
     }
 }
 
 private struct TechGridPattern: Shape {
-    var spacing: CGFloat = 26
+    var spacing: CGFloat = 28
 
     func path(in rect: CGRect) -> Path {
         var path = Path()
@@ -79,21 +153,72 @@ private struct TechGridPattern: Shape {
     }
 }
 
+private struct TechDiagonalLines: Shape {
+    var spacing: CGFloat = 22
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        var x: CGFloat = -rect.height
+        while x <= rect.width {
+            path.move(to: CGPoint(x: x, y: 0))
+            path.addLine(to: CGPoint(x: x + rect.height, y: rect.height))
+            x += spacing
+        }
+        return path
+    }
+}
+
+private struct TechScanlineOverlay: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        var y: CGFloat = 0
+        while y <= rect.height {
+            path.addRect(CGRect(x: 0, y: y, width: rect.width, height: 1))
+            y += 3
+        }
+        return path
+    }
+}
+
+private struct ScanlineBar: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.addRoundedRect(in: rect, cornerSize: CGSize(width: 40, height: 40))
+        return path
+    }
+}
+
+// MARK: - Neon Card Style
+
 private struct TechCardStyle: ViewModifier {
+    var glowColor: Color = AppTheme.neonCyan
+    var glowOpacity: Double = 0.12
+
     func body(content: Content) -> some View {
         content
             .background(AppTheme.techCardFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(AppTheme.techCardStroke, lineWidth: 1)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [
+                                glowColor.opacity(0.45),
+                                glowColor.opacity(0.18),
+                                glowColor.opacity(0.45),
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
             )
-            .shadow(color: AppTheme.techGlow.opacity(0.12), radius: 16, y: 0)
+            .shadow(color: glowColor.opacity(glowOpacity), radius: 14, y: 0)
     }
 }
 
 extension View {
-    func techCard() -> some View {
-        modifier(TechCardStyle())
+    func techCard(glow: Color = AppTheme.neonCyan, opacity: Double = 0.12) -> some View {
+        modifier(TechCardStyle(glowColor: glow, glowOpacity: opacity))
     }
 }
 
@@ -116,7 +241,7 @@ private struct ToastOverlay: ViewModifier {
                 if let toast {
                     HStack(spacing: 9) {
                         Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(AppTheme.rowColor(4))
+                            .foregroundStyle(AppTheme.neonLime)
                         Text(toast.text)
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.primary)
@@ -126,9 +251,9 @@ private struct ToastOverlay: ViewModifier {
                     .padding(.vertical, 12)
                     .background(.ultraThinMaterial, in: Capsule())
                     .overlay(
-                        Capsule().strokeBorder(AppTheme.techGlow.opacity(0.4), lineWidth: 1)
+                        Capsule().strokeBorder(AppTheme.neonCyan.opacity(0.55), lineWidth: 1)
                     )
-                    .shadow(color: AppTheme.techGlow.opacity(0.25), radius: 18, y: 6)
+                    .shadow(color: AppTheme.neonCyan.opacity(0.35), radius: 20, y: 6)
                     .padding(.horizontal, 24)
                     .padding(.top, 8)
                     .transition(.move(edge: .top).combined(with: .opacity))
@@ -151,6 +276,8 @@ extension View {
     }
 }
 
+// MARK: - Neon App Logo
+
 struct AppLogo: View {
     var size: CGFloat = 44
 
@@ -167,11 +294,213 @@ struct AppLogo: View {
                     .font(.title2.weight(.semibold))
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(AppTheme.accent)
+                    .background(
+                        LinearGradient(
+                            colors: [AppTheme.neonCyan, AppTheme.neonMagenta],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
             }
         }
         .frame(width: size, height: size)
         .clipShape(RoundedRectangle(cornerRadius: size * 0.22, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: size * 0.22, style: .continuous)
+                .strokeBorder(AppTheme.neonCyan.opacity(0.6), lineWidth: 1)
+        )
+        .shadow(color: AppTheme.neonCyan.opacity(0.45), radius: 8, y: 0)
         .accessibilityHidden(true)
+    }
+}
+
+// MARK: - Neon Section Header
+
+/// A small uppercase section title styled like a cyberpunk HUD: a vertical neon bar on the left,
+/// tracked-out caps text, and a thin glowing underline.
+struct NeonSectionHeader: View {
+    let title: String
+    var tint: Color = AppTheme.neonCyan
+    var symbol: String? = nil
+
+    var body: some View {
+        HStack(spacing: 8) {
+            RoundedRectangle(cornerRadius: 1.5)
+                .fill(tint)
+                .frame(width: 3, height: 16)
+                .shadow(color: tint.opacity(0.7), radius: 4)
+            if let symbol {
+                Image(systemName: symbol)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(tint)
+            }
+            Text(title)
+                .font(.subheadline.weight(.heavy))
+                .textCase(.uppercase)
+                .tracking(0.6)
+                .foregroundStyle(.primary)
+            Spacer()
+        }
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(
+                    LinearGradient(
+                        colors: [tint.opacity(0.6), .clear],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .frame(height: 0.5)
+                .offset(y: -2)
+        }
+    }
+}
+
+// MARK: - Neon Toggle
+
+/// A bespoke neon toggle styled for the cyberpunk theme. The track is a translucent neon capsule
+/// that fills with a cyan→magenta gradient when on, and a dim grey when off. The knob is a small
+/// glowing disc.
+struct NeonToggleStyle: ToggleStyle {
+    var onColor: Color = AppTheme.neonCyan
+    var offColor: Color = Color.white.opacity(0.18)
+
+    func makeBody(configuration: Configuration) -> some View {
+        let isOn = configuration.isOn
+        Button {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                configuration.isOn.toggle()
+            }
+        } label: {
+            ZStack(alignment: isOn ? .trailing : .leading) {
+                Capsule()
+                    .fill(
+                        isOn
+                            ? LinearGradient(
+                                colors: [onColor.opacity(0.85), AppTheme.neonMagenta.opacity(0.55)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                            : LinearGradient(
+                                colors: [offColor, offColor.opacity(0.5)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                    )
+                    .frame(width: 48, height: 28)
+                    .overlay(
+                        Capsule()
+                            .strokeBorder(
+                                (isOn ? onColor : Color.white.opacity(0.25)).opacity(0.7),
+                                lineWidth: 1
+                            )
+                    )
+                    .shadow(
+                        color: isOn ? onColor.opacity(0.65) : .clear,
+                        radius: isOn ? 8 : 0
+                    )
+
+                Circle()
+                    .fill(Color.white)
+                    .frame(width: 22, height: 22)
+                    .shadow(
+                        color: isOn ? onColor.opacity(0.8) : .clear,
+                        radius: isOn ? 6 : 0
+                    )
+                    .padding(3)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(configuration.isOn ? "On" : "Off")
+    }
+}
+
+extension Toggle {
+    /// Convenience to apply the cyberpunk neon style with a chosen accent color.
+    func neonTint(_ color: Color = AppTheme.neonCyan) -> some View {
+        self.toggleStyle(NeonToggleStyle(onColor: color))
+    }
+}
+
+// MARK: - Pulsing Dot
+
+/// A small dot that pulses in size and opacity, used as a "live / syncing" indicator.
+struct PulsingDot: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    var color: Color = AppTheme.neonLime
+    var size: CGFloat = 8
+
+    @State private var pulse: Double = 0
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(color.opacity(0.35))
+                .frame(width: size * 2.4, height: size * 2.4)
+                .scaleEffect(reduceMotion ? 1.0 : (1.0 + pulse * 0.6))
+                .opacity(reduceMotion ? 0.35 : (0.55 - pulse * 0.45))
+            Circle()
+                .fill(color)
+                .frame(width: size, height: size)
+                .shadow(color: color.opacity(0.8), radius: 4)
+        }
+        .onAppear {
+            guard !reduceMotion else { return }
+            withAnimation(.easeOut(duration: 1.1).repeatForever(autoreverses: false)) {
+                pulse = 1.0
+            }
+        }
+    }
+}
+
+// MARK: - Neon Button
+
+/// A bordered neon button that lights up the border and casts a glow when pressed/hovered.
+struct NeonButtonStyle: ButtonStyle {
+    var tint: Color = AppTheme.neonCyan
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .padding(.horizontal, 14)
+            .padding(.vertical, 9)
+            .foregroundStyle(tint)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(tint.opacity(configuration.isPressed ? 0.18 : 0.08))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(tint.opacity(configuration.isPressed ? 0.95 : 0.55), lineWidth: 1)
+            )
+            .shadow(color: tint.opacity(configuration.isPressed ? 0.5 : 0.25), radius: configuration.isPressed ? 10 : 6)
+            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
+    }
+}
+
+extension ButtonStyle where Self == NeonButtonStyle {
+    static var neon: NeonButtonStyle { NeonButtonStyle() }
+}
+
+extension Button {
+    func neonTint(_ color: Color = AppTheme.neonCyan) -> some View {
+        self.buttonStyle(NeonButtonStyle(tint: color))
+    }
+}
+
+// MARK: - Glitch Text
+
+/// Occasional subtitle text styled in monospaced neon caps — like a HUD readout.
+struct NeonReadout: View {
+    let text: String
+    var tint: Color = AppTheme.neonCyan
+
+    var body: some View {
+        Text(text)
+            .font(.caption2.weight(.bold))
+            .tracking(1.6)
+            .textCase(.uppercase)
+            .foregroundStyle(tint)
+            .shadow(color: tint.opacity(0.6), radius: 4)
     }
 }

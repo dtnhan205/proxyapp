@@ -33,7 +33,7 @@ enum PatchHubError: Error {
 }
 
 enum PatchHubService {
-    static let baseURL = URL(string: "https://patches.cheatiosvip.net")!
+    static let baseURL = URL(string: "https://serveripa.proxyvip.click")!
 
     static func fetchGames() async throws -> [RemoteGameSummary] {
         let url = baseURL.appendingPathComponent("api/games")

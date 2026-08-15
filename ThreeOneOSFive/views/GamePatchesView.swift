@@ -54,10 +54,15 @@ struct GamePatchesView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 if isSyncing {
-                    ProgressView()
+                    HStack(spacing: 6) {
+                        PulsingDot(color: AppTheme.neonCyan, size: 6)
+                        NeonReadout(text: "SYNC", tint: AppTheme.neonCyan)
+                    }
                 }
             }
         }
+        .toolbarBackground(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .task {
             await sync()
             await loadProjectStates()
@@ -89,7 +94,7 @@ struct GamePatchesView: View {
                         itemRow(item, colorIndex: index)
                         if item.id != items.last?.id {
                             Divider()
-                                .overlay(Color.white.opacity(0.06))
+                                .overlay(AppTheme.neonCyan.opacity(0.12))
                         }
                     }
                 }
@@ -97,37 +102,45 @@ struct GamePatchesView: View {
                 .padding(.bottom, 10)
             }
         }
-        .techCard()
+        .techCard(glow: AppTheme.neonMagenta, opacity: 0.18)
     }
 
     private var menuHeader: some View {
         HStack(spacing: 8) {
             Rectangle()
-                .fill(AppTheme.techGlow)
+                .fill(AppTheme.neonCyan)
                 .frame(width: 3, height: 16)
                 .clipShape(RoundedRectangle(cornerRadius: 1.5))
+                .shadow(color: AppTheme.neonCyan.opacity(0.8), radius: 4)
             Image(systemName: "bolt.fill")
                 .font(.footnote)
-                .foregroundStyle(AppTheme.techGlow)
+                .foregroundStyle(AppTheme.neonCyan)
             Text(language.text("patch.menu_title"))
                 .font(.subheadline.weight(.heavy))
                 .foregroundStyle(.primary)
                 .textCase(.uppercase)
-                .tracking(0.5)
+                .tracking(0.6)
             Spacer()
             if isSyncing {
-                ProgressView()
-                    .scaleEffect(0.8)
+                HStack(spacing: 6) {
+                    PulsingDot(color: AppTheme.neonCyan, size: 6)
+                    Text(language.text("patch.menu_auto_badge"))
+                        .font(.caption2.weight(.bold))
+                        .tracking(1.2)
+                        .foregroundStyle(AppTheme.neonCyan)
+                }
             } else {
                 Text(language.text("patch.menu_auto_badge"))
                     .font(.caption2.weight(.bold))
-                    .foregroundStyle(AppTheme.techGlow)
+                    .tracking(1.2)
+                    .foregroundStyle(AppTheme.neonCyan)
                     .padding(.horizontal, 9)
                     .padding(.vertical, 4)
-                    .background(AppTheme.techGlow.opacity(0.14), in: Capsule())
+                    .background(AppTheme.neonCyan.opacity(0.14), in: Capsule())
                     .overlay(
-                        Capsule().strokeBorder(AppTheme.techGlow.opacity(0.4), lineWidth: 1)
+                        Capsule().strokeBorder(AppTheme.neonCyan.opacity(0.55), lineWidth: 1)
                     )
+                    .shadow(color: AppTheme.neonCyan.opacity(0.4), radius: 6)
             }
         }
         .padding(.horizontal, 16)
@@ -141,9 +154,16 @@ struct GamePatchesView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .strokeBorder(AppTheme.techCardStroke, lineWidth: 1)
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [AppTheme.neonCyan.opacity(0.7), AppTheme.neonMagenta.opacity(0.5)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1.5
+                        )
                 )
-                .shadow(color: AppTheme.techGlow.opacity(0.18), radius: 14, y: 6)
+                .shadow(color: AppTheme.neonCyan.opacity(0.4), radius: 14, y: 6)
 
             Text(game.name)
                 .font(.title3.weight(.bold))
@@ -173,7 +193,14 @@ struct GamePatchesView: View {
 
     private var gameIconPlaceholder: some View {
         ZStack {
-            Color(hex: game.bannerColor) ?? AppTheme.accent
+            LinearGradient(
+                colors: [
+                    Color(hex: game.bannerColor) ?? AppTheme.neonCyan,
+                    AppTheme.neonMagenta.opacity(0.5),
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
             Image(systemName: "app.fill")
                 .resizable()
                 .scaledToFit()
@@ -208,7 +235,21 @@ struct GamePatchesView: View {
                 .font(.title3)
                 .foregroundStyle(rowColor)
                 .frame(width: 38, height: 38)
-                .background(rowColor.opacity(0.16), in: RoundedRectangle(cornerRadius: 10))
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [rowColor.opacity(0.25), rowColor.opacity(0.08)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(rowColor.opacity(0.5), lineWidth: 1)
+                )
+                .shadow(color: rowColor.opacity(0.35), radius: 6)
             VStack(alignment: .leading, spacing: 3) {
                 Text(item.project?.name ?? language.text("patch.locked_project"))
                     .font(.body.weight(.semibold))
@@ -220,10 +261,11 @@ struct GamePatchesView: View {
             Spacer()
             if togglingProjectID == item.id {
                 ProgressView()
+                    .tint(rowColor)
             } else {
                 Toggle("", isOn: projectToggleBinding(for: item))
                     .labelsHidden()
-                    .tint(AppTheme.techGlow)
+                    .neonTint(rowColor)
                     .disabled(toggleableCount == 0)
             }
         }
@@ -241,10 +283,12 @@ struct GamePatchesView: View {
         VStack(spacing: 12) {
             if isSyncing {
                 ProgressView()
+                    .tint(AppTheme.neonCyan)
             } else {
                 Image(systemName: "shippingbox")
                     .font(.system(size: 38, weight: .light))
-                    .foregroundStyle(AppTheme.accent)
+                    .foregroundStyle(AppTheme.neonCyan)
+                    .shadow(color: AppTheme.neonCyan.opacity(0.5), radius: 8)
                 Text(language.text("patch.empty_title"))
                     .font(.headline)
                 Text(language.text("patch.game_empty_message"))

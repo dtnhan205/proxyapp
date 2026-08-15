@@ -18,28 +18,35 @@ struct FolderPatchSelectionView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if isLoading {
-                    ProgressView(language.text("patch.folder_scanning"))
-                } else if candidates.isEmpty {
-                    VStack(spacing: 10) {
-                        Image(systemName: "folder")
-                            .font(.system(size: 36, weight: .light))
-                            .foregroundStyle(.secondary)
-                        Text(language.text("patch.folder_empty"))
-                            .font(.headline)
-                        Text(language.text("patch.folder_empty_message"))
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
+            ZStack {
+                TechBackground()
+                Group {
+                    if isLoading {
+                        ProgressView(language.text("patch.folder_scanning"))
+                            .tint(AppTheme.neonCyan)
+                    } else if candidates.isEmpty {
+                        VStack(spacing: 10) {
+                            Image(systemName: "folder")
+                                .font(.system(size: 36, weight: .light))
+                                .foregroundStyle(AppTheme.neonCyan)
+                                .shadow(color: AppTheme.neonCyan.opacity(0.5), radius: 6)
+                            Text(language.text("patch.folder_empty"))
+                                .font(.headline)
+                            Text(language.text("patch.folder_empty_message"))
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .padding()
+                    } else {
+                        fileList
                     }
-                    .padding()
-                } else {
-                    fileList
                 }
             }
             .navigationTitle(language.text("patch.select_files"))
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(language.text("common.cancel")) { dismiss() }
@@ -50,10 +57,12 @@ struct FolderPatchSelectionView: View {
                         dismiss()
                         onCreate(selection)
                     }
+                    .foregroundStyle(AppTheme.neonCyan)
                     .disabled(selectedIDs.isEmpty)
                 }
                 ToolbarItemGroup(placement: .bottomBar) {
                     Button(selectionActionTitle, action: toggleAll)
+                        .foregroundStyle(AppTheme.neonCyan)
                 }
             }
             .task { loadCandidates() }
@@ -69,7 +78,7 @@ struct FolderPatchSelectionView: View {
                         systemImage: "exclamationmark.triangle.fill"
                     )
                     .font(.subheadline)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(AppTheme.neonMagenta)
                 }
             }
 
@@ -80,7 +89,8 @@ struct FolderPatchSelectionView: View {
                     } label: {
                         HStack(spacing: 12) {
                             Image(systemName: "doc.fill")
-                                .foregroundStyle(AppTheme.accent)
+                                .foregroundStyle(AppTheme.neonCyan)
+                                .shadow(color: AppTheme.neonCyan.opacity(0.4), radius: 4)
                                 .frame(width: 24)
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(candidate.url.lastPathComponent)
@@ -98,7 +108,7 @@ struct FolderPatchSelectionView: View {
                                       ? "checkmark.circle.fill"
                                       : "circle")
                                     .foregroundStyle(selectedIDs.contains(candidate.id)
-                                                     ? AppTheme.accent
+                                                     ? AppTheme.neonCyan
                                                      : Color.secondary)
                                 Text(ByteCountFormatter.string(
                                     fromByteCount: candidate.byteCount,
@@ -123,6 +133,7 @@ struct FolderPatchSelectionView: View {
             }
         }
         .listStyle(.plain)
+        .scrollContentBackground(.hidden)
     }
 
     private var selectionActionTitle: String {
