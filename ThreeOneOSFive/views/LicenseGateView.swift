@@ -93,7 +93,7 @@ struct LicenseGateView: View {
                     .shadow(color: Color(red: 0.0, green: 0.94, blue: 1.0).opacity(0.7), radius: 8)
             }
 
-            Text("NEON://KEY.AUTH")
+            Text("KEY AUTH")
                 .font(.system(size: 22, weight: .heavy, design: .rounded))
                 .tracking(4)
                 .foregroundColor(Color(red: 0.0, green: 0.94, blue: 1.0))
@@ -235,7 +235,7 @@ struct LicenseGateView: View {
     }
 
     private var footer: some View {
-        Text("// Mỗi key chỉ dùng được trên một số thiết bị giới hạn\n// Liên hệ admin để được cấp key mới")
+        Text("// Mỗi key chỉ dùng được 1 thiết bị cố định\n// Liên hệ admin để được reset key")
             .font(.system(size: 10, weight: .regular, design: .monospaced))
             .foregroundColor(Color(white: 0.35))
             .multilineTextAlignment(.center)

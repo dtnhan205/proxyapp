@@ -93,7 +93,12 @@ struct GamePatchesView: View {
     }
 
     private var hasValidKey: Bool {
-        LicenseKeyManager.savedKey != nil && LicenseKeyManager.isSavedKeyValidNow
+        // Nếu không có key đã lưu thì chắc chắn chưa hợp lệ. Có key rồi thì
+        // mặc định coi là hợp lệ — đã qua LicenseGateView rồi (gate chỉ mở khi
+        // server xác thực thành công). Không ép thêm expiresAt ở đây vì server
+        // có thể không trả expiresAt cho vài response shape (vd. verify only),
+        // sẽ làm giả → kẹt không bật được toggle.
+        LicenseKeyManager.savedKey?.isEmpty == false
     }
 
     /// The single bordered box holding every patch for this game as a switch row, matching the
