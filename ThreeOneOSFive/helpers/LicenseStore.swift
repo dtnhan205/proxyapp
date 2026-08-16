@@ -86,10 +86,13 @@ final class LicenseStore: ObservableObject {
         }
         // Resolve tổng duration về GIÂY. Ưu tiên durationMinutes > durationHours >
         // durationDays — cho phép server trả bất kỳ đơn vị nào tuỳ key length.
+        // Server giờ trả `Double?` (làm tròn về integer cho key >= 1 ngày, giữ
+        // float cho key lẻ — vd 36h → 1.5 ngày). Dùng Double arithmetic để
+        // không mất precision trước khi convert về Int giây.
         let resolvedDurationSeconds: Int? = {
-            if let m = status.durationMinutes, m > 0 { return m * 60 }
-            if let h = status.durationHours, h > 0 { return h * 3_600 }
-            if let d = status.durationDays, d > 0 { return d * 86_400 }
+            if let m = status.durationMinutes, m > 0 { return Int(m * 60) }
+            if let h = status.durationHours, h > 0 { return Int(h * 3_600) }
+            if let d = status.durationDays, d > 0 { return Int(d * 86_400) }
             return nil
         }()
         // Tính expiresAt khi server không trả: dùng activatedAt + durationSeconds
