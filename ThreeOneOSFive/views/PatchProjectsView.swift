@@ -218,11 +218,14 @@ struct PatchProjectRow: View {
                 Text(item.project?.name ?? language.text("patch.locked_project"))
                     .font(.body.weight(.semibold))
                     .foregroundStyle(.primary)
-                Text(item.isLocked
-                     ? language.text("patch.tap_to_unlock")
-                     : language.text("patch.rules_count", Int64(item.project?.rules.count ?? 0)))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if item.isLocked {
+                    Text(language.text("patch.tap_to_unlock"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    NeonShimmerBar(count: item.project?.rules.count ?? 0, tint: tint)
+                        .padding(.top, 2)
+                }
             }
             Spacer()
             if item.summary.isPasswordProtected {

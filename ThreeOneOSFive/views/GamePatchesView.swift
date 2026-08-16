@@ -248,7 +248,7 @@ struct GamePatchesView: View {
         let rowColor = AppTheme.rowColor(colorIndex)
 
         return HStack(spacing: 12) {
-            Image(systemName: "bolt.fill")
+            Image(systemName: PatchIconCatalog.symbol(for: item.id))
                 .font(.title3)
                 .foregroundStyle(rowColor)
                 .frame(width: 38, height: 38)
@@ -271,9 +271,8 @@ struct GamePatchesView: View {
                 Text(item.project?.name ?? language.text("patch.locked_project"))
                     .font(.body.weight(.semibold))
                     .foregroundStyle(.primary)
-                Text(language.text("patch.rules_count", Int64(rules.count)))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                NeonShimmerBar(count: rules.count, tint: rowColor)
+                    .padding(.top, 2)
             }
             Spacer()
             if togglingProjectID == item.id {

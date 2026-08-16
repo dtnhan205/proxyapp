@@ -43,7 +43,13 @@ struct RootView: View {
         do {
             let serial = DeviceIdentity.serial()
             _ = try await PatchHubService.verifyKey(key: key, deviceSerial: serial)
-            await MainActor.run { gateDecision = .unlocked }
+            await MainActor.run {
+                // Verify OK → RAM chưa có expiresAt vì init() không đọc cache.
+                // Khôi phục từ UserDefaults để footer đếm ngược thời gian còn lại
+                // thực của key, không reset về 0.
+                store.restoreSession()
+                gateDecision = .unlocked
+            }
         } catch {
             // Verify fail — xoá key local, đẩy về gate.
             await MainActor.run {

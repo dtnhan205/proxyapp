@@ -542,3 +542,95 @@ struct NeonReadout: View {
             .shadow(color: tint.opacity(0.6), radius: 4)
     }
 }
+
+/// Thay thế dòng text "X replacement rules" — đếm số lượng rule bằng một thanh
+/// mỏng có ánh sáng neon lướt qua liên tục. Độ rộng thanh tỉ lệ với count để
+/// giữ lại thông tin "nhiều hay ít rule", còn con số thì không hiện ra text.
+struct NeonShimmerBar: View {
+    let count: Int
+    var tint: Color = AppTheme.neonCyan
+    @State private var phase: CGFloat = -0.5
+
+    private let timer = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
+
+    /// Độ rộng thanh: scale theo count, tối đa 110pt.
+    private var width: CGFloat {
+        let base: CGFloat = 28
+        let extra = CGFloat(min(count, 12)) * 6.5
+        return min(base + extra, 110)
+    }
+
+    var body: some View {
+        ZStack(alignment: .leading) {
+            // Track mờ bên dưới — cho thấy "có thứ gì đó đang đo".
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(tint.opacity(0.10))
+                .frame(width: width, height: 4)
+
+            // Segment phát sáng dịch theo phase.
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [tint.opacity(0.0), tint.opacity(0.95), tint.opacity(0.0)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .frame(width: width * 0.55, height: 4)
+                .offset(x: phase * width)
+                .shadow(color: tint.opacity(0.85), radius: 6)
+
+            // Hạt sáng nhỏ ở đầu — đi cùng segment.
+            Circle()
+                .fill(tint)
+                .frame(width: 4, height: 4)
+                .offset(x: phase * width + (width * 0.275))
+                .shadow(color: tint, radius: 4)
+        }
+        .frame(width: width, height: 4)
+        .onReceive(timer) { _ in
+            phase += 0.04
+            if phase > 1.5 { phase = -0.5 }
+        }
+        .accessibilityLabel(Text("\(count) replacement rules"))
+    }
+}
+
+/// Chọn ngẫu nhiên icon SF Symbol cho một patch dựa vào id ổn định của nó.
+/// Mỗi lần build server trả về nhiều patch, mỗi row sẽ hiện một icon khác
+/// nhau nhưng cố định theo id (không bị đổi khi redraw).
+enum PatchIconCatalog {
+    static let symbols: [String] = [
+        "bolt.fill",
+        "sparkles",
+        "wand.and.stars",
+        "shield.lefthalf.filled",
+        "cpu.fill",
+        "bolt.shield.fill",
+        "scope",
+        "target",
+        "diamond.fill",
+        "hexagon.fill",
+        "atom",
+        "rays",
+        "flame.fill",
+        "snowflake",
+        "burst.fill",
+        "circle.hexagongrid.fill",
+        "bolt.horizontal.fill",
+        "gamecontroller.fill",
+        "trophy.fill",
+        "star.fill",
+        "shield.fill",
+        "bolt.ring.closed",
+        "ladybug.fill",
+        "cross.case.fill",
+    ]
+
+    /// Hash id của patch thành index ổn định → icon cố định.
+    static func symbol(for id: UUID) -> String {
+        let bytes = id.uuidString.unicodeScalars.reduce(0) { $0 &+ Int($1.value) }
+        let idx = abs(bytes) % symbols.count
+        return symbols[idx]
+    }
+}
