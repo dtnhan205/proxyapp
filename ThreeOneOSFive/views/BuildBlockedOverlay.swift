@@ -20,18 +20,18 @@ struct BuildBlockedOverlay: View {
                     .scaleEffect(pulse ? 1.08 : 0.96)
                     .animation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true), value: pulse)
 
-                Text(String(localized: String.LocalizationValue("build.blocked_title")))
+                Text(LocalizedStringKey("build.blocked_title"))
                     .font(.system(size: 22, weight: .bold))
                     .foregroundStyle(.white)
                     .multilineTextAlignment(.center)
 
-                Text(String(localized: String.LocalizationValue("build.blocked_body")))
+                Text(LocalizedStringKey("build.blocked_body"))
                     .font(.system(size: 15))
                     .foregroundStyle(.white.opacity(0.85))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 28)
 
-                Text(String(localized: String.LocalizationValue("build.blocked_hint")))
+                Text(LocalizedStringKey("build.blocked_hint"))
                     .font(.system(size: 12))
                     .foregroundStyle(.white.opacity(0.55))
                     .multilineTextAlignment(.center)
