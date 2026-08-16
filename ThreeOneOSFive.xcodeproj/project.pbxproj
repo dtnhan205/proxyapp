@@ -60,6 +60,7 @@
 		3105L010 /* LicenseStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3105L011; };
 		3105L012 /* DeviceIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3105L013; };
 		3105L014 /* LicenseGateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3105L015; };
+		3105K001 /* KeyCountdownFooter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3105K002; };
 		3105L016 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3105L017; };
 		3105A228 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 3105A120; };
 		3105A211 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3105A031; };
@@ -135,6 +136,7 @@
 		3105L011 /* LicenseStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LicenseStore.swift; sourceTree = "<group>"; };
 		3105L013 /* DeviceIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceIdentity.swift; sourceTree = "<group>"; };
 		3105L015 /* LicenseGateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LicenseGateView.swift; sourceTree = "<group>"; };
+		3105K002 /* KeyCountdownFooter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyCountdownFooter.swift; sourceTree = "<group>"; };
 		3105L017 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		3105A121 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
 		3105A122 /* vi */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = vi; path = vi.lproj/Localizable.strings; sourceTree = "<group>"; };
@@ -214,6 +216,7 @@
 			3105F106 /* WallpaperLabView.swift */,
 			3105L004 /* LicenseKeyView.swift */,
 			3105L015 /* LicenseGateView.swift */,
+			3105K002 /* KeyCountdownFooter.swift */,
 			3105L017 /* RootView.swift */,
 		);
 		path = views;
@@ -386,6 +389,7 @@
 				3105L010,
 				3105L012,
 				3105L014,
+				3105K001,
 				3105L016,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
