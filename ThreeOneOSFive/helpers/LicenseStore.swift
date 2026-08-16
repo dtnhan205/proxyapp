@@ -31,11 +31,26 @@ final class LicenseStore: ObservableObject {
     func save(key: String, status: RemoteKeyStatus) {
         let d = UserDefaults.standard
         d.set(key, forKey: keyDefaultsKey)
+        var resolvedExpiresAt: Date?
         if let s = status.expiresAt, let date = ISO8601DateFormatter().date(from: s) {
+            resolvedExpiresAt = date
+        }
+        var resolvedActivatedAt: Date?
+        if let s = status.activatedAt, let date = ISO8601DateFormatter().date(from: s) {
+            resolvedActivatedAt = date
+        }
+        // Fallback khi server không trả expiresAt: nếu có durationDays thì tính
+        // từ activatedAt, hoặc từ thời điểm hiện tại. Đảm bảo footer luôn có
+        // mốc đếm ngược, không phụ thuộc response shape.
+        if resolvedExpiresAt == nil, let dur = status.durationDays, dur > 0 {
+            let base = resolvedActivatedAt ?? Date()
+            resolvedExpiresAt = base.addingTimeInterval(TimeInterval(dur) * 86_400)
+        }
+        if let date = resolvedExpiresAt {
             d.set(date.timeIntervalSince1970, forKey: expiresKey)
             self.expiresAt = date
         }
-        if let s = status.activatedAt, let date = ISO8601DateFormatter().date(from: s) {
+        if let date = resolvedActivatedAt {
             d.set(date.timeIntervalSince1970, forKey: activatedKey)
             self.activatedAt = date
         }
