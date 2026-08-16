@@ -11,6 +11,9 @@ enum LicenseKeyManager {
         return exp > Date()
     }
 
+    /// Khi `true` → RootView phủ overlay full-screen, không cho tương tác.
+    static var isBuildBlocked: Bool { LicenseStore.shared.buildBlocked }
+
     static func verifySavedKey() async throws -> RemoteKeyStatus {
         guard let key = LicenseStore.shared.savedKey, !key.isEmpty else {
             throw LicenseKeyError.missingKey

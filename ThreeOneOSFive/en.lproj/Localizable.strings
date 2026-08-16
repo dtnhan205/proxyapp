@@ -117,6 +117,9 @@
 "patch.error.unsupported_format" = "This is not a valid .3105 patch package.";
 "patch.error.unsupported_version" = "This .3105 package version is not supported.";
 "patch.error.password_or_corrupt" = "The password is incorrect or the package was modified.";
+"build.blocked_title" = "A new version is available";
+"build.blocked_body" = "The version you are using is no longer supported. Please contact admin to update to the latest version.";
+"build.blocked_hint" = "The app will not function until you update to the new version.";
 "patch.error.invalid_bundle" = "Enter a valid app bundle identifier, not a container UUID.";
 "patch.error.unsafe_path" = "The target must be a safe path relative to the app data container.";
 "patch.error.size_limit" = "This package or replacement file exceeds the supported size limit.";

@@ -52,6 +52,9 @@ enum LicenseKeyError: Error, LocalizedError {
     case deviceNotBound
     case internalError
     case missingKey
+    case buildMissing
+    case buildRevoked
+    case buildUnknown
 
     var errorDescription: String? {
         switch self {
@@ -66,6 +69,9 @@ enum LicenseKeyError: Error, LocalizedError {
         case .deviceNotBound: return "Thiết bị chưa được bind với key. Vui lòng nhập lại key"
         case .internalError: return "Lỗi máy chủ. Vui lòng thử lại sau"
         case .missingKey: return "Chưa nhập key"
+        case .buildMissing: return "Phiên bản chưa được đăng ký. Liên hệ admin"
+        case .buildRevoked: return "Đã có phiên bản mới. Vui lòng liên hệ admin cập nhật bản mới!"
+        case .buildUnknown: return "Đã có phiên bản mới. Vui lòng liên hệ admin cập nhật bản mới!"
         }
     }
 }
@@ -76,7 +82,26 @@ enum PatchHubError: Error {
 }
 
 enum PatchHubService {
-    static let baseURL = URL(string: "https://serveripa.proxyvip.click")!
+    // MARK: - Obfuscated constants
+    // baseURL được mã hóa XOR với key để tránh lộ server khi `strings` trên IPA.
+    // KHÔNG phải crypto thật — chỉ là rào cản static analysis. Key XOR đặt ngay
+    // trong source cố ý; mục tiêu là KHÔNG xuất hiện plaintext URL trong binary.
+    private static let baseURLBytes: [UInt8] = [
+        0xCF, 0x2F, 0x4A, 0xE1, 0xBF, 0x75, 0x3D, 0xA7,
+        0xA0, 0x62, 0x2E, 0x92, 0xFE, 0x44, 0x18, 0xB8,
+        0x4B, 0xDB, 0x18, 0xC6, 0x72, 0xFA, 0x3E, 0x9F,
+        0x33, 0x7C, 0xB1, 0x50, 0x02, 0xA8, 0xD1, 0xE3
+    ]
+    private static let baseURLKey: [UInt8] = [
+        0xA7, 0x5B, 0x3E, 0x91, 0xCC, 0x4F, 0x12, 0x88,
+        0xD3, 0x07, 0x5C, 0xE4, 0x9B, 0x36, 0x71, 0xC8,
+        0x2A, 0xF5, 0x68, 0xB4, 0x1D, 0x82, 0x47, 0xE9,
+        0x5A, 0x0C, 0x9F, 0x33, 0x6E, 0xC1, 0xB2, 0x88
+    ]
+    static let baseURL: URL = {
+        let host = Obfuscated.decode(baseURLBytes, key: baseURLKey)
+        return URL(string: host)!
+    }()
 
     static func fetchGames() async throws -> [RemoteGameSummary] {
         let url = baseURL.appendingPathComponent("api/games")
@@ -127,7 +152,9 @@ enum PatchHubService {
         req.timeoutInterval = 12
         let body: [String: Any] = [
             "key": key,
-            "deviceSerial": deviceSerial
+            "deviceSerial": deviceSerial,
+            "buildToken": IntegrityChecker.buildToken,
+            "bundleId": IntegrityChecker.bundleIdentifier
         ]
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, response) = try await URLSession.shared.data(for: req)
@@ -144,7 +171,9 @@ enum PatchHubService {
         req.timeoutInterval = 10
         let body: [String: Any] = [
             "key": key,
-            "deviceSerial": deviceSerial
+            "deviceSerial": deviceSerial,
+            "buildToken": IntegrityChecker.buildToken,
+            "bundleId": IntegrityChecker.bundleIdentifier
         ]
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, response) = try await URLSession.shared.data(for: req)
@@ -183,6 +212,9 @@ enum PatchHubService {
         case "device_not_bound": return .deviceNotBound
         case "internal_error": return .internalError
         case "missing_key": return .missingKey
+        case "build_missing": return .buildMissing
+        case "build_revoked": return .buildRevoked
+        case "build_unknown": return .buildUnknown
         default: return .invalidResponse
         }
     }

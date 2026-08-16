@@ -117,6 +117,9 @@
 "patch.error.unsupported_format" = "这不是有效的 .3105 补丁软件包。";
 "patch.error.unsupported_version" = "不支持此 .3105 软件包版本。";
 "patch.error.password_or_corrupt" = "密码不正确，或软件包已被修改。";
+"build.blocked_title" = "已有新版本";
+"build.blocked_body" = "您当前使用的版本已不再受支持。请联系管理员更新到最新版本。";
+"build.blocked_hint" = "在更新到新版本之前，应用将无法使用。";
 "patch.error.invalid_bundle" = "请输入有效的应用 bundle identifier，而不是容器 UUID。";
 "patch.error.unsafe_path" = "目标必须是应用数据容器内的安全相对路径。";
 "patch.error.size_limit" = "此软件包或替换文件超出支持的大小限制。";

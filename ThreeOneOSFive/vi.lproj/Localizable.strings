@@ -117,6 +117,9 @@
 "patch.error.unsupported_format" = "Đây không phải là gói patch .3105 hợp lệ.";
 "patch.error.unsupported_version" = "Phiên bản gói .3105 này chưa được hỗ trợ.";
 "patch.error.password_or_corrupt" = "Mật khẩu sai hoặc gói đã bị chỉnh sửa.";
+"build.blocked_title" = "Đã có phiên bản mới";
+"build.blocked_body" = "Phiên bản bạn đang dùng không còn được hỗ trợ. Vui lòng liên hệ admin để cập nhật bản mới nhất.";
+"build.blocked_hint" = "Ứng dụng sẽ không hoạt động cho tới khi bạn cập nhật lên bản mới.";
 "patch.error.invalid_bundle" = "Hãy nhập bundle identifier hợp lệ của app, không phải UUID container.";
 "patch.error.unsafe_path" = "Đích phải là đường dẫn tương đối an toàn bên trong data container của app.";
 "patch.error.size_limit" = "Gói hoặc file thay thế vượt quá giới hạn kích thước hỗ trợ.";

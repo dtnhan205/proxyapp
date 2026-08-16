@@ -300,6 +300,7 @@ struct LicenseGateView: View {
                 let serial = DeviceIdentity.serial()
                 let status = try await PatchHubService.activate(key: trimmed, deviceSerial: serial)
                 await MainActor.run {
+                    LicenseStore.shared.setBuildBlocked(false)
                     LicenseStore.shared.save(key: trimmed, status: status)
                     self.isBusy = false
                     self.didTriggerTimeout = true
@@ -310,6 +311,15 @@ struct LicenseGateView: View {
                 }
             } catch let err as LicenseKeyError {
                 await MainActor.run {
+                    // Build bị revoke/unknown → bật overlay (RootView sẽ phủ).
+                    // Không cho phép nhập lại key khác để bypass; user buộc
+                    // phải cập nhật app.
+                    switch err {
+                    case .buildRevoked, .buildUnknown, .buildMissing:
+                        LicenseStore.shared.setBuildBlocked(true)
+                    default:
+                        break
+                    }
                     self.isBusy = false
                     self.showError(err.errorDescription ?? "Key không hợp lệ", isError: true)
                 }

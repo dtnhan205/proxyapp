@@ -10,6 +10,12 @@ struct ThreeOneOSFiveApp: App {
         AppLanguage(rawValue: languageCode) ?? .english
     }
 
+    init() {
+        // Chạy ngay khi app mở. Mọi chỉnh sửa binary (đổi URL, hook
+        // Obfuscated, rebrand bundle ID, jailbreak) → kill.
+        IntegrityChecker.runStartupChecks()
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()

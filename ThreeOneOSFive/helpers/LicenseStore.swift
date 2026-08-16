@@ -10,11 +10,16 @@ final class LicenseStore: ObservableObject {
     @Published private(set) var expiresAt: Date?
     @Published private(set) var activatedAt: Date?
     @Published private(set) var durationDays: Int?
+    /// Khi `true` → overlay "Đã có phiên bản mới..." phủ full-screen và
+    /// block toàn bộ tương tác. Persist qua UserDefaults nên thoát ra vào
+    /// lại vẫn thấy. Chỉ xoá khi verify/activate thành công trở lại.
+    @Published private(set) var buildBlocked: Bool = false
 
     private let keyDefaultsKey = "license.savedKey"
     private let expiresKey = "license.expiresAt"
     private let activatedKey = "license.activatedAt"
     private let durationKey = "license.durationDays"
+    private let buildBlockedKey = "license.buildBlocked"
 
     private init() {
         // Mỗi lần vào app đều bắt nhập lại: không đọc key từ UserDefaults khi
@@ -25,6 +30,7 @@ final class LicenseStore: ObservableObject {
         self.savedKey = nil
         self.activatedAt = nil
         self.durationDays = nil
+        self.buildBlocked = UserDefaults.standard.bool(forKey: buildBlockedKey)
         if let stored = UserDefaults.standard.object(forKey: expiresKey) as? Double {
             self.expiresAt = Date(timeIntervalSince1970: stored)
         } else {
@@ -97,6 +103,14 @@ final class LicenseStore: ObservableObject {
             self.durationDays = dur
         }
         self.savedKey = key
+    }
+
+    /// Persist cờ build-blocked lên UserDefaults. Khi server trả
+    /// `build_revoked` / `build_unknown` → gọi hàm này với `true` → overlay
+    /// sẽ phủ full-screen ngay khi RootView render.
+    func setBuildBlocked(_ blocked: Bool) {
+        UserDefaults.standard.set(blocked, forKey: buildBlockedKey)
+        self.buildBlocked = blocked
     }
 
     func clear() {
