@@ -13,25 +13,35 @@ struct KeyCountdownFooter: View {
     var body: some View {
         Group {
             if let key = store.savedKey, !key.isEmpty, let exp = store.expiresAt {
-                HStack(spacing: 10) {
-                    PulsingDot(color: countdownColor(exp: exp), size: 6)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 10) {
+                        PulsingDot(color: countdownColor(exp: exp), size: 6)
 
-                    Text(maskedKey(key))
-                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                        .tracking(1.0)
-                        .foregroundStyle(AppTheme.neonCyan)
-                        .shadow(color: AppTheme.neonCyan.opacity(0.5), radius: 4)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
+                        Text(maskedKey(key))
+                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                            .tracking(1.0)
+                            .foregroundStyle(AppTheme.neonCyan)
+                            .shadow(color: AppTheme.neonCyan.opacity(0.5), radius: 4)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
 
-                    Spacer(minLength: 6)
+                        Spacer(minLength: 6)
 
-                    Text(countdownString(exp: exp))
-                        .font(.system(size: 11, weight: .bold, design: .monospaced))
-                        .tracking(0.8)
-                        .foregroundStyle(countdownColor(exp: exp))
-                        .shadow(color: countdownColor(exp: exp).opacity(0.55), radius: 4)
-                        .monospacedDigit()
+                        Text(countdownString(exp: exp))
+                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                            .tracking(0.8)
+                            .foregroundStyle(countdownColor(exp: exp))
+                            .shadow(color: countdownColor(exp: exp).opacity(0.55), radius: 4)
+                            .monospacedDigit()
+                    }
+                    if let summary = activationSummaryText(exp: exp) {
+                        Text(summary)
+                            .font(.system(size: 9, weight: .medium, design: .monospaced))
+                            .tracking(0.6)
+                            .foregroundStyle(countdownColor(exp: exp).opacity(0.65))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
@@ -111,5 +121,26 @@ struct KeyCountdownFooter: View {
             return String(format: "%dd %02d:%02d:%02d", days, hours, mins, s)
         }
         return String(format: "%02d:%02d:%02d", hours, mins, s)
+    }
+
+    /// Dòng phụ thông tin kích hoạt. Giúp user hiểu key còn bao lâu kể từ
+    /// lúc activate đầu (server lazy-expiration), khi giá trị countdown hiện
+    /// nhỏ hơn tổng `durationDays` thì key đã dùng được một khoảng.
+    /// Ví dụ: `Duration: 7D · Since: 6D ago`.
+    private func activationSummaryText(exp: Date) -> String? {
+        guard let dur = store.durationDays, dur > 0 else { return nil }
+        guard let act = store.activatedAt else {
+            return "Duration: \(dur)D"
+        }
+        let elapsed = max(0, Int(now.timeIntervalSince(act)))
+        let elapsedDays = elapsed / 86_400
+        let sinceLabel: String
+        if elapsedDays == 0 {
+            let elapsedHours = max(0, elapsed / 3600)
+            sinceLabel = elapsedHours <= 0 ? "vừa active" : "\(elapsedHours)h ago"
+        } else {
+            sinceLabel = "\(elapsedDays)d ago"
+        }
+        return "Duration: \(dur)D · Active: \(sinceLabel)"
     }
 }

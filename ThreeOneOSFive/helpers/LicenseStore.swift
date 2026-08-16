@@ -54,32 +54,36 @@ final class LicenseStore: ObservableObject {
         let d = UserDefaults.standard
         d.set(key, forKey: keyDefaultsKey)
         var resolvedExpiresAt: Date?
-        if let s = status.expiresAt, let date = ISO8601DateFormatter().date(from: s) {
+        if let s = status.expiresAt, let date = Self.parseISO8601(s) {
             resolvedExpiresAt = date
         }
         var resolvedActivatedAt: Date?
-        if let s = status.activatedAt, let date = ISO8601DateFormatter().date(from: s) {
+        if let s = status.activatedAt, let date = Self.parseISO8601(s) {
             resolvedActivatedAt = date
         }
         // Fallback khi server không trả expiresAt: nếu có durationDays thì tính
-        // từ activatedAt, hoặc từ thời điểm hiện tại. Đảm bảo footer luôn có
-        // mốc đếm ngược, không phụ thuộc response shape.
+        // từ thời điểm hiện tại hoặc từ activatedAt tuỳ ngữ cảnh.
+        // - `firstActivation == true` hoặc server không trả trường này: ưu tiên
+        //   dùng `Date()` để user thấy đúng tổng `durationDays` còn lại (UX
+        //   cho first-time bind và cho legacy server không trả firstActivation).
+        // - `firstActivation == false` (re-bind device): dùng activatedAt server
+        //   gửi để phản ánh đúng thời gian còn lại thực của key.
         if resolvedExpiresAt == nil, let dur = status.durationDays, dur > 0 {
-            let base = resolvedActivatedAt ?? Date()
-            resolvedExpiresAt = base.addingTimeInterval(TimeInterval(dur) * 86_400)
-        }
-        // Bảo vệ thời gian còn lại thực của key: nếu local cache vẫn còn hạn
-        // (expiresAt > now) thì GIỮ NGUYÊN, không ghi đè bằng expiresAt mới từ
-        // activate. Tránh hiện tượng mỗi lần vào app phải nhập lại key → server
-        // reset activatedAt → countdown chạy lại từ đầu.
-        let storedExpires = d.object(forKey: expiresKey) as? Double
-        let storedExpiresDate = storedExpires.map { Date(timeIntervalSince1970: $0) }
-        let finalExpiresAt: Date? = {
-            if let local = storedExpiresDate, local > Date() {
-                return local
+            if status.firstActivation == false, let base = resolvedActivatedAt {
+                resolvedExpiresAt = base.addingTimeInterval(TimeInterval(dur) * 86_400)
+            } else {
+                resolvedExpiresAt = Date().addingTimeInterval(TimeInterval(dur) * 86_400)
             }
-            return resolvedExpiresAt
-        }()
+        }
+        NSLog("[LicenseStore] save key=\(key) expiresAtString=\(status.expiresAt ?? "<nil>") activatedAtString=\(status.activatedAt ?? "<nil>") durationDays=\(status.durationDays ?? -1) resolvedExpiresAt=\(resolvedExpiresAt?.description ?? "<nil>") now=\(Date().description)")
+        if let exp = resolvedExpiresAt {
+            let secs = Int(exp.timeIntervalSinceNow)
+            NSLog("[LicenseStore] countdown remaining=\(secs)s (\(secs/3600)h\( (secs%3600)/60 )m\(secs%60)s) expLocal=\(exp.description)")
+        }
+        // Ưu tiên server response làm mốc duy nhất. Local cache chỉ dùng ở
+        // `init()` để hiển thị countdown trong lúc chờ auth — không được override
+        // response mới từ server, vì server nắm quyền quyết định thời hạn thực.
+        let finalExpiresAt: Date? = resolvedExpiresAt
         if let date = finalExpiresAt {
             d.set(date.timeIntervalSince1970, forKey: expiresKey)
             self.expiresAt = date
@@ -105,5 +109,17 @@ final class LicenseStore: ObservableObject {
         self.expiresAt = nil
         self.activatedAt = nil
         self.durationDays = nil
+    }
+
+    /// Parse ISO8601 — chấp nhận cả `Z` và `+07:00`; thử cả có/không fractional
+    /// seconds. Trả về UTC an toàn để cộng `durationDays` không lệch.
+    private static func parseISO8601(_ s: String) -> Date? {
+        let withInternet = ISO8601DateFormatter()
+        withInternet.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = withInternet.date(from: s) { return date }
+        let standard = ISO8601DateFormatter()
+        standard.formatOptions = [.withInternetDateTime]
+        if let date = standard.date(from: s) { return date }
+        return nil
     }
 }
