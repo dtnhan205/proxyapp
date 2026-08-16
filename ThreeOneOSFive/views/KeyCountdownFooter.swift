@@ -126,21 +126,46 @@ struct KeyCountdownFooter: View {
     /// Dòng phụ thông tin kích hoạt. Giúp user hiểu key còn bao lâu kể từ
     /// lúc activate đầu (server lazy-expiration), khi giá trị countdown hiện
     /// nhỏ hơn tổng `durationDays` thì key đã dùng được một khoảng.
-    /// Ví dụ: `Duration: 7D · Since: 6D ago`.
+    /// Ví dụ với key 7 ngày: `Duration: 7D · Since: 6D ago`.
+    /// Ví dụ với key 1 giờ: `Duration: 1H · Since: 5m ago`.
     private func activationSummaryText(exp: Date) -> String? {
-        guard let dur = store.durationDays, dur > 0 else { return nil }
+        // Ưu tiên `durationHours` (cho key ngắn < 1 ngày). Nếu absent hoặc ≥24
+        // thì fallback `durationDays` cho key dài hạn.
+        let useHours: Int? = {
+            if let h = store.durationHours, h > 0, h < 24 { return h }
+            return nil
+        }()
+        let useDays: Int? = {
+            if useHours != nil { return nil }
+            if let d = store.durationDays, d > 0 { return d }
+            return nil
+        }()
+        guard useHours != nil || useDays != nil else { return nil }
+        let durationLabel: String
+        if let h = useHours {
+            durationLabel = "\(h)H"
+        } else if let d = useDays {
+            durationLabel = "\(d)D"
+        } else {
+            return nil
+        }
         guard let act = store.activatedAt else {
-            return "Duration: \(dur)D"
+            return "Duration: \(durationLabel)"
         }
         let elapsed = max(0, Int(now.timeIntervalSince(act)))
-        let elapsedDays = elapsed / 86_400
         let sinceLabel: String
-        if elapsedDays == 0 {
-            let elapsedHours = max(0, elapsed / 3600)
-            sinceLabel = elapsedHours <= 0 ? "vừa active" : "\(elapsedHours)h ago"
+        if elapsed < 3_600 {
+            let m = max(1, elapsed / 60)
+            sinceLabel = "\(m)m ago"
+        } else if elapsed < 86_400 {
+            let h = elapsed / 3_600
+            let m = (elapsed % 3_600) / 60
+            sinceLabel = m == 0 ? "\(h)h ago" : "\(h)h\(m)m ago"
         } else {
-            sinceLabel = "\(elapsedDays)d ago"
+            let d = elapsed / 86_400
+            let h = (elapsed % 86_400) / 3_600
+            sinceLabel = h == 0 ? "\(d)d ago" : "\(d)d\(h)h ago"
         }
-        return "Duration: \(dur)D · Active: \(sinceLabel)"
+        return "Duration: \(durationLabel) · Active: \(sinceLabel)"
     }
 }

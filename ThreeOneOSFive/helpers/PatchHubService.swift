@@ -33,7 +33,16 @@ struct RemoteKeyStatus: Decodable, Equatable {
     let reason: String?
     let expiresAt: String?
     let activatedAt: String?
+    /// Tổng thời lượng key tính theo NGÀY (key 1d, 7d, 30d, ...). Server trả
+    /// `durationDays: 0` hoặc `null` khi key ngắn hạn dưới 1 ngày.
     let durationDays: Int?
+    /// Optional: tổng thời lượng key tính theo GIỜ. Server nên trả cho key
+    /// ngắn hạn (1h, 2h, 6h, 12h). Khi present, client ưu tiên dùng thay cho
+    /// `durationDays` để countdown hiển thị chính xác "X giờ Y phút".
+    let durationHours: Int?
+    /// Optional: tổng thời lượng key tính theo PHÚT. Dùng cho key rất ngắn
+    /// (< 1h) — server có thể trả `durationMinutes: 30` chẳng hạn.
+    let durationMinutes: Int?
     let remainingSlots: Int?
     let firstActivation: Bool?
     let alreadyBound: Bool?
