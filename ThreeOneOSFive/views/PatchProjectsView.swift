@@ -26,25 +26,13 @@ struct PatchProjectsView: View {
         ZStack {
             TechBackground()
 
-            List {
-                if store.items.isEmpty && !store.isBusy {
-                    emptyState
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(Color.clear)
-                        .listRowInsets(EdgeInsets())
-                } else {
-                    ForEach(store.items) { item in
-                        itemRow(item)
-                            .listRowBackground(AppTheme.techCardFill)
-                            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
-                    }
-                    .onDelete { offsets in
-                        offsets.map { store.items[$0] }.forEach(store.delete)
-                    }
+            ScrollView {
+                VStack(spacing: 16) {
+                    projectsCard
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 16)
             }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
             .refreshable { store.reload() }
         }
         .navigationTitle(language.text("patch.title"))
@@ -103,9 +91,6 @@ struct PatchProjectsView: View {
                 store.create(project: project, password: password)
             }
         }
-        .sheet(item: $store.passwordRequest, onDismiss: store.cancelUnlock) { _ in
-            PatchUnlockView(store: store)
-        }
         .alert(item: $store.alert) { alert in
             Alert(
                 title: Text(language.text(alert.titleKey)),
@@ -116,19 +101,66 @@ struct PatchProjectsView: View {
     }
 
     @ViewBuilder
-    private func itemRow(_ item: PatchLibraryItem) -> some View {
-        if item.isLocked {
-            Button { store.requestUnlock(for: item) } label: {
-                PatchProjectRow(item: item, language: language)
+    private func itemRow(_ item: PatchLibraryItem, colorIndex: Int) -> some View {
+        PatchProjectRow(item: item, language: language)
+    }
+
+    private var projectsCard: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Rectangle()
+                    .fill(AppTheme.neonCyan)
+                    .frame(width: 3, height: 16)
+                    .clipShape(RoundedRectangle(cornerRadius: 1.5))
+                    .shadow(color: AppTheme.neonCyan.opacity(0.8), radius: 4)
+                Image(systemName: "shippingbox.fill")
+                    .font(.footnote)
+                    .foregroundStyle(AppTheme.neonCyan)
+                Text(language.text("patch.title"))
+                    .font(.subheadline.weight(.heavy))
+                    .foregroundStyle(.primary)
+                    .textCase(.uppercase)
+                    .tracking(0.6)
+                Spacer()
+                Text("\(store.items.count)")
+                    .font(.caption2.weight(.bold))
+                    .tracking(1.2)
+                    .foregroundStyle(AppTheme.neonCyan)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 4)
+                    .background(AppTheme.neonCyan.opacity(0.14), in: Capsule())
+                    .overlay(
+                        Capsule().strokeBorder(AppTheme.neonCyan.opacity(0.55), lineWidth: 1)
+                    )
+                    .shadow(color: AppTheme.neonCyan.opacity(0.4), radius: 6)
             }
-            .buttonStyle(.plain)
-        } else {
-            NavigationLink {
-                PatchProjectDetailView(store: store, projectID: item.id)
-            } label: {
-                PatchProjectRow(item: item, language: language)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+
+            if store.items.isEmpty && !store.isBusy {
+                emptyState
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(Array(store.items.enumerated()), id: \.element.id) { index, item in
+                        itemRow(item, colorIndex: index)
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button(role: .destructive) {
+                                    store.delete(item)
+                                } label: {
+                                    Label(language.text("common.delete"), systemImage: "trash")
+                                }
+                            }
+                        if item.id != store.items.last?.id {
+                            Divider()
+                                .overlay(AppTheme.neonCyan.opacity(0.12))
+                        }
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.bottom, 10)
             }
         }
+        .techCard(glow: AppTheme.neonCyan, opacity: 0.18)
     }
 
     private var emptyState: some View {
@@ -161,26 +193,27 @@ struct PatchProjectRow: View {
     let language: AppLanguage
 
     var body: some View {
+        let tint = AppTheme.neonCyan
         HStack(spacing: 12) {
             Image(systemName: item.isLocked ? "lock.doc.fill" : "shippingbox.fill")
                 .font(.title3)
-                .foregroundStyle(AppTheme.neonCyan)
-                .frame(width: 34, height: 34)
+                .foregroundStyle(tint)
+                .frame(width: 38, height: 38)
                 .background(
-                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .fill(
                             LinearGradient(
-                                colors: [AppTheme.neonCyan.opacity(0.22), AppTheme.neonCyan.opacity(0.06)],
+                                colors: [tint.opacity(0.25), tint.opacity(0.08)],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        .strokeBorder(AppTheme.neonCyan.opacity(0.45), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(tint.opacity(0.5), lineWidth: 1)
                 )
-                .shadow(color: AppTheme.neonCyan.opacity(0.4), radius: 6)
+                .shadow(color: tint.opacity(0.35), radius: 6)
             VStack(alignment: .leading, spacing: 3) {
                 Text(item.project?.name ?? language.text("patch.locked_project"))
                     .font(.body.weight(.semibold))
@@ -200,8 +233,7 @@ struct PatchProjectRow: View {
                     .accessibilityLabel(language.text("patch.password_protected"))
             }
         }
-        .padding(.vertical, 4)
-        .listRowBackground(AppTheme.techCardFill)
+        .padding(.vertical, 10)
     }
 }
 

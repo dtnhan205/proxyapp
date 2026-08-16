@@ -41,9 +41,6 @@ struct GamePatchesView: View {
             ScrollView {
                 VStack(spacing: 20) {
                     header
-                    if !hasValidKey {
-                        licenseBanner
-                    }
                     menuCard
                 }
                 .padding(.horizontal, 16)
@@ -72,8 +69,11 @@ struct GamePatchesView: View {
             await sync()
             await loadProjectStates()
         }
-        .sheet(item: $store.passwordRequest, onDismiss: store.cancelUnlock) { _ in
-            PatchUnlockView(store: store)
+        .onAppear {
+            // Vào game mà chưa nhập key thì bắt nhập ngay, không đợi Toggle.
+            if !hasValidKey {
+                showKeySheet = true
+            }
         }
         .alert(item: $store.alert) { alert in
             Alert(
@@ -94,57 +94,6 @@ struct GamePatchesView: View {
 
     private var hasValidKey: Bool {
         LicenseKeyManager.savedKey != nil && LicenseKeyManager.isSavedKeyValidNow
-    }
-
-    /// Yellow banner shown above the menu whenever there is no valid saved
-    /// license key. Tapping it (or "NHẬP KEY") opens the activation sheet.
-    private var licenseBanner: some View {
-        VStack(spacing: 12) {
-            HStack(spacing: 10) {
-                Image(systemName: "exclamationmark.shield.fill")
-                    .font(.title3)
-                    .foregroundStyle(AppTheme.neonMagenta)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("VUI LÒNG NHẬP KEY")
-                        .font(.subheadline.weight(.heavy))
-                        .tracking(1.0)
-                        .foregroundStyle(.primary)
-                    Text("Bật/tắt patch sẽ bị chặn cho đến khi bạn kích hoạt key.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-            }
-            Button {
-                showKeySheet = true
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "key.fill")
-                    Text("NHẬP KEY")
-                        .font(.footnote.weight(.heavy))
-                        .tracking(1.2)
-                }
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
-                .background(
-                    LinearGradient(
-                        colors: [AppTheme.neonCyan, AppTheme.neonMagenta],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                .shadow(color: AppTheme.neonCyan.opacity(0.45), radius: 10)
-            }
-        }
-        .padding(14)
-        .background(AppTheme.techCardFill)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(AppTheme.neonMagenta.opacity(0.4), lineWidth: 1)
-        )
     }
 
     /// The single bordered box holding every patch for this game as a switch row, matching the
@@ -280,15 +229,11 @@ struct GamePatchesView: View {
     private func itemRow(_ item: PatchLibraryItem, colorIndex: Int) -> some View {
         if item.isLocked {
             Button { store.requestUnlock(for: item) } label: {
-                PatchProjectRow(item: item, language: language)
+                toggleRow(item, colorIndex: colorIndex)
             }
             .buttonStyle(.plain)
         } else {
-            NavigationLink {
-                PatchProjectDetailView(store: store, projectID: item.id)
-            } label: {
-                toggleRow(item, colorIndex: colorIndex)
-            }
+            toggleRow(item, colorIndex: colorIndex)
         }
     }
 

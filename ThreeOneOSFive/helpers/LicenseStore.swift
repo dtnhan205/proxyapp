@@ -17,16 +17,13 @@ final class LicenseStore: ObservableObject {
     private let durationKey = "license.durationDays"
 
     private init() {
-        let d = UserDefaults.standard
-        self.savedKey = d.string(forKey: keyDefaultsKey)
-        if let ts = d.object(forKey: expiresKey) as? Double {
-            self.expiresAt = Date(timeIntervalSince1970: ts)
-        }
-        if let ts = d.object(forKey: activatedKey) as? Double {
-            self.activatedAt = Date(timeIntervalSince1970: ts)
-        }
-        let dur = d.integer(forKey: durationKey)
-        self.durationDays = dur > 0 ? dur : nil
+        // Mỗi lần vào app đều bắt nhập lại: không đọc key từ UserDefaults khi
+        // khởi động. Key hợp lệ chỉ tồn tại trong RAM trong phiên hiện tại; bản
+        // lưu trên UserDefaults (nếu có) chỉ dùng để Logout/clear().
+        self.savedKey = nil
+        self.expiresAt = nil
+        self.activatedAt = nil
+        self.durationDays = nil
     }
 
     var isSaved: Bool { (savedKey?.isEmpty == false) }
