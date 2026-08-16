@@ -97,12 +97,6 @@ enum IntegrityChecker {
     @inline(never)
     static func kill(reason: String) -> Never {
         NSLog("[IntegrityChecker] KILL: \(reason)")
-        // Ghi audit log lên server trước khi thoát (best-effort, 1s timeout).
-        // Phòng khi người dùng hỏi "vì sao app đóng?" → có dấu vết.
-        // Lưu ý: best-effort, nếu mạng chậm không block quá 1s.
-        var req = URLRequest(url: URL(string: "https://nonexistent.invalid")!)
-        req.timeoutInterval = 0.5
-        _ = try? URLSession.shared.data(for: req)
         // Hard exit. Không chạy code sau.
         exit(0)
     }
