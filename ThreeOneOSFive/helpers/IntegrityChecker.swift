@@ -23,7 +23,7 @@ enum IntegrityChecker {
     /// Hard-coded SHA256 của bundle identifier hợp lệ. Nếu attacker
     /// rebrand / re-sign app → bundle ID khác → mismatch → kill.
     /// Phải khớp với `PRODUCT_BUNDLE_IDENTIFIER` trong `project.pbxproj`.
-    private static let expectedBundleID = "com.apple.mobile.MobileHouseArrest"
+    private static let expectedBundleID = "com.proxyvip.vn"
 
     /// Build token plaintext. Đổi dòng này khi build IPA mới — admin cũng
     /// add token tương ứng trên `/admin/builds`. Không mã hóa để tiện sửa
@@ -32,7 +32,7 @@ enum IntegrityChecker {
     /// Khi token này bị admin revoke (hoặc không tồn tại trên server) →
     /// mọi thiết bị đang dùng token sẽ bị phủ overlay "Đã có phiên bản
     /// mới" full-screen, persist qua UserDefaults.
-    static let buildToken: String = "KCF7MKSFCUMRRG6BMFUMNVGZ"
+    static let buildToken: String = "C9S9Q2RQEEQ5VPF4JX8CMLTR"
 
     /// Bundle identifier hiện tại, gửi kèm request để server đối chiếu.
     static let bundleIdentifier: String = Bundle.main.bundleIdentifier ?? expectedBundleID

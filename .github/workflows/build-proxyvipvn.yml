@@ -1,4 +1,4 @@
-name: Build 3105
+name: Build ProxyVipVn
 
 on:
   workflow_dispatch:
@@ -20,36 +20,36 @@ jobs:
           mkdir -p build
           xcodebuild \
             -project ThreeOneOSFive.xcodeproj \
-            -scheme 3105 \
+            -scheme ProxyVipVn \
             -configuration Release \
             -destination 'generic/platform=iOS' \
-            -archivePath build/3105.xcarchive \
+            -archivePath build/ProxyVipVn.xcarchive \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             archive
 
-      - name: Package IPA (Payload/3105.app structure)
+      - name: Package IPA (Payload/ProxyVipVn.app structure)
         run: |
           set -euo pipefail
-          APP_DIR="build/3105.xcarchive/Products/Applications/3105.app"
+          APP_DIR="build/ProxyVipVn.xcarchive/Products/Applications/ProxyVipVn.app"
           if [ ! -d "$APP_DIR" ]; then
             echo "App bundle not found. Listing available apps:"
-            ls build/3105.xcarchive/Products/Applications/
+            ls build/ProxyVipVn.xcarchive/Products/Applications/
             exit 1
           fi
           rm -rf build/ipa
           mkdir -p build/ipa/Payload
           cp -r "$APP_DIR" build/ipa/Payload/
           cd build/ipa
-          zip -r 3105.ipa Payload
+          zip -r ProxyVipVn.ipa Payload
           ls -la
           echo "---"
-          unzip -l 3105.ipa | head -20
+          unzip -l ProxyVipVn.ipa | head -20
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: 3105-ipa
-          path: build/ipa/3105.ipa
+          name: ProxyVipVn-ipa
+          path: build/ipa/ProxyVipVn.ipa
           if-no-files-found: error
