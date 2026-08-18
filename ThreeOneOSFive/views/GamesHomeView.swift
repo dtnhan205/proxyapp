@@ -7,6 +7,7 @@ struct GamesHomeView: View {
     @StateObject private var store = PatchProjectStore()
     @State private var games: [RemoteGameSummary] = []
     @State private var isLoadingGames = false
+    @State private var showingGamePatches = false
     @State private var selectedGame: RemoteGameSummary?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -26,6 +27,7 @@ struct GamesHomeView: View {
                         ForEach(Array(games.enumerated()), id: \.element.id) { index, game in
                             Button {
                                 selectedGame = game
+                                showingGamePatches = true
                             } label: {
                                 GameCardView(
                                     title: game.name,
@@ -41,8 +43,10 @@ struct GamesHomeView: View {
                     }
                     .padding(16)
                     .animation(.easeOut(duration: 0.3), value: games)
-                    .navigationDestination(item: $selectedGame) { game in
-                        GamePatchesView(game: game, store: store)
+                    .navigationDestination(isPresented: $showingGamePatches) {
+                        if let game = selectedGame {
+                            GamePatchesView(game: game, store: store)
+                        }
                     }
 
                     if games.isEmpty && !isLoadingGames {
