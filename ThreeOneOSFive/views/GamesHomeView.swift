@@ -7,6 +7,7 @@ struct GamesHomeView: View {
     @StateObject private var store = PatchProjectStore()
     @State private var games: [RemoteGameSummary] = []
     @State private var isLoadingGames = false
+    @State private var selectedGame: RemoteGameSummary?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let columns = [GridItem(.adaptive(minimum: 150), spacing: 14)]
@@ -23,8 +24,8 @@ struct GamesHomeView: View {
 
                     LazyVGrid(columns: columns, spacing: 14) {
                         ForEach(Array(games.enumerated()), id: \.element.id) { index, game in
-                            NavigationLink {
-                                GamePatchesView(game: game, store: store)
+                            Button {
+                                selectedGame = game
                             } label: {
                                 GameCardView(
                                     title: game.name,
@@ -40,6 +41,9 @@ struct GamesHomeView: View {
                     }
                     .padding(16)
                     .animation(.easeOut(duration: 0.3), value: games)
+                    .navigationDestination(item: $selectedGame) { game in
+                        GamePatchesView(game: game, store: store)
+                    }
 
                     if games.isEmpty && !isLoadingGames {
                         Text(language.text("patch.no_games_yet"))
@@ -149,7 +153,6 @@ struct GameCardView: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var glowPhase: Double = 0
-    @State private var isPressed = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -220,16 +223,6 @@ struct GameCardView: View {
                     lineWidth: 1
                 )
         )
-        .shadow(color: accent.opacity(isPressed ? 0.55 : 0.25), radius: isPressed ? 14 : 10)
-        .scaleEffect(isPressed ? 0.97 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
-        .onTapGesture {
-            // Visual feedback only - navigation handled by parent NavigationLink
-            isPressed = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                isPressed = false
-            }
-        }
         .onAppear {
             guard !reduceMotion else { return }
             // Performance: Slower animation (8s vs 3.5s = 57% slower)
