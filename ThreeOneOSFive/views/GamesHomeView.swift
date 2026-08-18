@@ -163,7 +163,7 @@ struct GameCardView: View {
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
-                // Animated sheen across the banner.
+                // Performance: Slower sheen (8s vs 3.5s), skip animation if reduceMotion
                 if !reduceMotion {
                     LinearGradient(
                         colors: [
@@ -234,7 +234,8 @@ struct GameCardView: View {
         )
         .onAppear {
             guard !reduceMotion else { return }
-            withAnimation(.linear(duration: 3.5).repeatForever(autoreverses: false)) {
+            // Performance: Slower animation (8s vs 3.5s = 57% slower)
+            withAnimation(.linear(duration: 8.0).repeatForever(autoreverses: false)) {
                 glowPhase = 1.0
             }
         }
