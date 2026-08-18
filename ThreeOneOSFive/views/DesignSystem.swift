@@ -546,63 +546,55 @@ struct NeonReadout: View {
 /// Thay thế dòng text "X replacement rules" — đếm số lượng rule bằng một thanh
 /// mỏng có ánh sáng neon lướt qua liên tục. Độ rộng thanh tỉ lệ với count để
 /// giữ lại thông tin "nhiều hay ít rule", còn con số thì không hiện ra text.
+/// Performance: Timer chạy chậm (250ms) thay vì 50ms để giảm CPU usage.
 struct NeonShimmerBar: View {
     let count: Int
     var tint: Color = AppTheme.neonCyan
     @State private var phase: CGFloat = -0.5
 
-    // MARK: - Performance-Optimized Shimmer Bar
-    /// Đếm số lượng rule bằng một thanh mỏng có ánh sáng neon lướt qua.
-    /// Timer chạy chậm (250ms) thay vì 50ms để giảm CPU usage.
-    struct NeonShimmerBar: View {
-        let count: Int
-        var tint: Color = AppTheme.neonCyan
-        @State private var phase: CGFloat = -0.5
+    /// Performance: Timer 250ms thay vì 50ms - giảm 80% CPU usage
+    private let timer = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
 
-        /// Performance: Timer 250ms thay vì 50ms - giảm 80% CPU usage
-        private let timer = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
+    /// Độ rộng thanh: scale theo count, tối đa 110pt.
+    private var width: CGFloat {
+        let base: CGFloat = 28
+        let extra = CGFloat(min(count, 12)) * 6.5
+        return min(base + extra, 110)
+    }
 
-        /// Độ rộng thanh: scale theo count, tối đa 110pt.
-        private var width: CGFloat {
-            let base: CGFloat = 28
-            let extra = CGFloat(min(count, 12)) * 6.5
-            return min(base + extra, 110)
-        }
+    var body: some View {
+        ZStack(alignment: .leading) {
+            // Track mờ bên dưới
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(tint.opacity(0.10))
+                .frame(width: width, height: 4)
 
-        var body: some View {
-            ZStack(alignment: .leading) {
-                // Track mờ bên dưới
-                RoundedRectangle(cornerRadius: 2, style: .continuous)
-                    .fill(tint.opacity(0.10))
-                    .frame(width: width, height: 4)
-
-                // Segment phát sáng dịch theo phase (chậm hơn: 0.02 thay vì 0.04)
-                RoundedRectangle(cornerRadius: 2, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [tint.opacity(0.0), tint.opacity(0.95), tint.opacity(0.0)],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
+            // Segment phát sáng dịch theo phase (chậm hơn: 0.02 thay vì 0.04)
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [tint.opacity(0.0), tint.opacity(0.95), tint.opacity(0.0)],
+                        startPoint: .leading,
+                        endPoint: .trailing
                     )
-                    .frame(width: width * 0.55, height: 4)
-                    .offset(x: phase * width)
-                    .shadow(color: tint.opacity(0.85), radius: 6)
+                )
+                .frame(width: width * 0.55, height: 4)
+                .offset(x: phase * width)
+                .shadow(color: tint.opacity(0.85), radius: 6)
 
-                // Hạt sáng nhỏ ở đầu
-                Circle()
-                    .fill(tint)
-                    .frame(width: 4, height: 4)
-                    .offset(x: phase * width + (width * 0.275))
-                    .shadow(color: tint, radius: 4)
-            }
-            .frame(width: width, height: 4)
-            .onReceive(timer) { _ in
-                phase += 0.02 // Chậm hơn 50%
-                if phase > 1.5 { phase = -0.5 }
-            }
-            .accessibilityLabel(Text("\(count) replacement rules"))
+            // Hạt sáng nhỏ ở đầu
+            Circle()
+                .fill(tint)
+                .frame(width: 4, height: 4)
+                .offset(x: phase * width + (width * 0.275))
+                .shadow(color: tint, radius: 4)
         }
+        .frame(width: width, height: 4)
+        .onReceive(timer) { _ in
+            phase += 0.02 // Chậm hơn 50%
+            if phase > 1.5 { phase = -0.5 }
+        }
+        .accessibilityLabel(Text("\(count) replacement rules"))
     }
 }
 
