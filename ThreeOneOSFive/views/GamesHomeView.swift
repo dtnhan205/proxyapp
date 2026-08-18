@@ -223,15 +223,13 @@ struct GameCardView: View {
         .shadow(color: accent.opacity(isPressed ? 0.55 : 0.25), radius: isPressed ? 14 : 10)
         .scaleEffect(isPressed ? 0.97 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in
-                    if !isPressed { isPressed = true }
-                }
-                .onEnded { _ in
-                    isPressed = false
-                }
-        )
+        .onTapGesture {
+            // Visual feedback only - navigation handled by parent NavigationLink
+            isPressed = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                isPressed = false
+            }
+        }
         .onAppear {
             guard !reduceMotion else { return }
             // Performance: Slower animation (8s vs 3.5s = 57% slower)
