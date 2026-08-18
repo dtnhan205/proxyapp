@@ -13,7 +13,7 @@ struct RemotePatchSummary: Decodable, Identifiable, Equatable {
     let gameId: String?
 }
 
-struct RemoteGameSummary: Decodable, Identifiable, Equatable {
+struct RemoteGameSummary: Decodable, Identifiable, Equatable, Hashable {
     let id: String
     let name: String
     let bundleID: String
