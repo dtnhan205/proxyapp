@@ -96,7 +96,7 @@ enum DevicePatchService {
         }
 
         // Get device info for diagnostics
-        let deviceInfo = "\(AppInfo.osVersion) (\(AppInfo.osBuild)) - \(AppInfo.deviceModel)"
+        let deviceInfo = "\(AppInfo.osVersion) (\(AppInfo.osBuild))"
         Task { @MainActor in
             PatchLogService.shared.debug("Device: \(deviceInfo)")
         }
@@ -114,7 +114,7 @@ enum DevicePatchService {
             }
             let testPath = "/var/mobile"
             let testClean = testPath.hasSuffix("/") ? String(testPath.dropLast()) : testPath
-            let testPathC = testClean.utf8CString.map { Int8($0) }
+            var testPathC = testClean.utf8CString.map { Int8($0) }
             let testHandle = bad_query(&testPathC, false, nil, false)
             if testHandle < 0 {
                 Task { @MainActor in
