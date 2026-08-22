@@ -556,7 +556,7 @@ struct GamePatchesView: View {
                     .padding(.vertical, 4)
                 }
                 .background(Color.black.opacity(0.95))
-                .onChange(of: patchLogService.logs.count) { _, _ in
+                .onChange(of: patchLogService.logs.count) { _ in
                     if let lastLog = patchLogService.logs.last {
                         withAnimation {
                             proxy.scrollTo(lastLog.id, anchor: .bottom)
