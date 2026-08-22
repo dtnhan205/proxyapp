@@ -1,6 +1,8 @@
 import Foundation
 
 enum DevicePatchService {
+    private static var exploitHasRun = false
+
     static func apply(project: PatchProject) throws -> PatchTransactionReceipt {
         let bundleIDs = orderedBundleIdentifiers(in: project)
         return try withResolvedContainers(bundleIDs: bundleIDs) { roots in
@@ -86,10 +88,35 @@ enum DevicePatchService {
         return project.rules.compactMap { seen.insert($0.bundleID).inserted ? $0.bundleID : nil }
     }
 
+    private static func ensureExploitReady() throws {
+        if exploitHasRun { return }
+
+        Task { @MainActor in
+            PatchLogService.shared.info("Initializing kernel exploit...")
+        }
+
+        let result = kexploit_opa334()
+        if result == 0 {
+            exploitHasRun = true
+            Task { @MainActor in
+                PatchLogService.shared.success("Kernel exploit initialized successfully")
+            }
+        } else {
+            Task { @MainActor in
+                PatchLogService.shared.error("Kernel exploit FAILED with code: \(result)")
+                PatchLogService.shared.error("This device may not be supported by the exploit")
+            }
+            throw PatchPackageError.applyFailed
+        }
+    }
+
     private static func withResolvedContainers<T>(
         bundleIDs: [String],
         operation: ([String: URL]) throws -> T
     ) throws -> T {
+        // Ensure exploit is ready before accessing containers
+        try ensureExploitReady()
+
         var roots: [String: URL] = [:]
         var handles: [Int64] = []
         defer { handles.forEach(bad_query_release) }
@@ -125,8 +152,7 @@ enum DevicePatchService {
             if handle < 0 {
                 Task { @MainActor in
                     PatchLogService.shared.error("bad_query() FAILED, handle=\(handle)")
-                    PatchLogService.shared.error("This usually means the kernel exploit didn't run successfully!")
-                    PatchLogService.shared.info("Try running the exploit first from the Dashboard")
+                    PatchLogService.shared.error("Kernel exploit may not be compatible with this iOS version")
                 }
                 throw PatchPackageError.targetAppUnavailable(bundleID)
             }
