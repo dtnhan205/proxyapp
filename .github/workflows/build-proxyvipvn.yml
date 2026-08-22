@@ -27,7 +27,24 @@ jobs:
           if grep -q "ProxyVipVn V2" ThreeOneOSFive/helpers/AppBranding.swift; then
             echo "Plaintext brand leaked into AppBranding.swift — check gen_branding.py"; exit 1
           fi
-          echo "AppBranding.swift generated OK ($(wc -c < ThreeOneOSFive/helpers/AppBranding.swift) bytes)"
+          # Đếm tuple entries: phải khớp với số brand strings × số locales (5 × 3 = 15).
+          # Mỗi entry phải kết thúc bằng `,` nếu không phải entry cuối của locale block.
+          ENTRY_COUNT=$(grep -cE '^\s*\("[a-zA-Z]+",' ThreeOneOSFive/helpers/AppBranding.swift || true)
+          if [ "$ENTRY_COUNT" != "15" ]; then
+            echo "Expected 15 entries (5 strings × 3 locales), found $ENTRY_COUNT"; exit 1
+          fi
+          # Mỗi tuple trong array literal PHẢI kết thúc bằng dấu phẩy, nếu không
+          # Swift compiler báo "expected ',' separator" (đã từng xảy ra khi gen
+          # quên trailing comma). Tìm các dòng chứa tuple literal hex-array
+          # (bắt đầu bằng `("` và có `[0x` ở giữa) kết thúc bằng `])` — đây là
+          # entry THIẾU trailing comma. Bỏ qua dòng typealias `(String, [UInt8], [UInt8])`.
+          BAD_TUPLES=$(grep -E '^\s*\("[a-zA-Z]+",.*\]\)$' ThreeOneOSFive/helpers/AppBranding.swift || true)
+          if [ -n "$BAD_TUPLES" ]; then
+            echo "Found tuple without trailing comma — Swift will fail to compile:"
+            echo "$BAD_TUPLES"
+            exit 1
+          fi
+          echo "AppBranding.swift generated OK ($(wc -c < ThreeOneOSFive/helpers/AppBranding.swift) bytes, $ENTRY_COUNT entries)"
 
       - name: Archive (no signing)
         run: |

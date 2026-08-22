@@ -65,7 +65,9 @@ def generate_key_for_locale(locale: str, total_bytes: int) -> bytes:
 
 
 def make_locale_block(locale: str, strings: dict) -> str:
-    """Generate 1 block Swift code cho 1 locale. Mỗi entry là positional tuple."""
+    """Generate 1 block Swift code cho 1 locale. Mỗi entry là positional tuple.
+    Lưu ý: phải có dấu `,` SAU mỗi tuple để Swift array literal phân tách entries.
+    """
     tuple_items = []
     for name, value in strings.items():
         key = generate_key_for_locale(locale, len(value.encode("utf-8")))
@@ -73,7 +75,8 @@ def make_locale_block(locale: str, strings: dict) -> str:
         key_pretty = fmt_bytes(key)
         ct_pretty = fmt_bytes(ct)
         # Positional tuple (String, [UInt8], [UInt8]) — khớp kiểu dưới.
-        tuple_items.append(f'            ("{name}", [{key_pretty}], [{ct_pretty}])')
+        # BẮT BUỘC có `,` ở cuối, nếu không Swift báo "expected ',' separator".
+        tuple_items.append(f'            ("{name}", [{key_pretty}], [{ct_pretty}]),')
     return "\n".join(tuple_items)
 
 
