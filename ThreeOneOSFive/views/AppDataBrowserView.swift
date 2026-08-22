@@ -32,7 +32,7 @@ struct AppDataBrowserView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStackCompat {
             ZStack {
                 TechBackground()
                 appList
@@ -62,8 +62,8 @@ struct AppDataBrowserView: View {
                     .accessibilityLabel(language.text("browser.retry"))
                 }
             }
-            .toolbarBackground(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+            .toolbarBackgroundCompat(.visible, for: .navigationBar)
             .onAppear {
                 if !hasLoaded {
                     hasLoaded = true
@@ -109,8 +109,8 @@ struct AppDataBrowserView: View {
         }
         .listStyle(.plain)
         .environment(\.defaultMinListRowHeight, 48)
-        .scrollContentBackground(.hidden)
-        .scrollDismissesKeyboard(.interactively)
+        .scrollContentBackgroundCompat()
+        .scrollDismissesKeyboardCompat()
         .overlay {
             Group {
                 switch overlayState {

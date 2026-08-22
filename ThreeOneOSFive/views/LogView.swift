@@ -7,7 +7,7 @@ struct LogView: View {
     @Environment(\.appLanguage) private var language
 
     var body: some View {
-        NavigationStack {
+        NavigationStackCompat {
             ZStack {
                 TechBackground()
                 Group {
@@ -78,8 +78,8 @@ struct LogView: View {
             }
             .navigationTitle(language.text("logs.title"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+            .toolbarBackgroundCompat(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button(language.text("logs.clear"), role: .destructive) { appLog.entries.removeAll() }

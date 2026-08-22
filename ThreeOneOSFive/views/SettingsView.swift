@@ -22,8 +22,8 @@ struct SettingsView: View {
         .tint(AppTheme.neonCyan)
         .navigationTitle(language.text("settings.title"))
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+        .toolbarBackgroundCompat(.visible, for: .navigationBar)
     }
 
     private var profileCard: some View {

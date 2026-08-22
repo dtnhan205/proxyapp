@@ -17,7 +17,7 @@ struct FolderPatchSelectionView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStackCompat {
             ZStack {
                 TechBackground()
                 Group {
@@ -45,8 +45,8 @@ struct FolderPatchSelectionView: View {
             }
             .navigationTitle(language.text("patch.select_files"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+            .toolbarBackgroundCompat(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(language.text("common.cancel")) { dismiss() }
@@ -133,7 +133,7 @@ struct FolderPatchSelectionView: View {
             }
         }
         .listStyle(.plain)
-        .scrollContentBackground(.hidden)
+        .scrollContentBackgroundCompat()
     }
 
     private var selectionActionTitle: String {

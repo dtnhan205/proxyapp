@@ -28,7 +28,7 @@ struct WallpaperLabView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStackCompat {
             ZStack {
                 TechBackground()
                 List {
@@ -37,12 +37,12 @@ struct WallpaperLabView: View {
                     if !activeReceipts.isEmpty { resetSection }
                 }
                 .listStyle(.insetGrouped)
-                .scrollContentBackground(.hidden)
+                .scrollContentBackgroundCompat()
             }
             .navigationTitle(language.text("wallpaper.title"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+            .toolbarBackgroundCompat(.visible, for: .navigationBar)
             .toolbar { toolbarContent }
             .overlay { busyOverlay }
             .alert(item: $alert, content: alertContent)

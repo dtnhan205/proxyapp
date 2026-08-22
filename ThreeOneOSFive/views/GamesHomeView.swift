@@ -14,7 +14,7 @@ struct GamesHomeView: View {
     private let columns = [GridItem(.adaptive(minimum: 150), spacing: 14)]
 
     var body: some View {
-        NavigationStack {
+        NavigationStackCompat {
             ZStack {
                 TechBackground()
 
@@ -43,7 +43,7 @@ struct GamesHomeView: View {
                     }
                     .padding(16)
                     .animation(.easeOut(duration: 0.3), value: games)
-                    .navigationDestination(isPresented: $showingGamePatches) {
+                    .navigationDestinationCompat(isPresented: $showingGamePatches) {
                         if let game = selectedGame {
                             GamePatchesView(game: game, store: store)
                         }
@@ -79,8 +79,8 @@ struct GamesHomeView: View {
                     .accessibilityLabel(AppBranding.string("tabSettings", locale: language.rawValue))
                 }
             }
-            .toolbarBackground(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+            .toolbarBackgroundCompat(.visible, for: .navigationBar)
             .refreshable { await loadGames() }
             .task { await loadGames() }
             .sheet(item: $draftCoordinator.request) { request in

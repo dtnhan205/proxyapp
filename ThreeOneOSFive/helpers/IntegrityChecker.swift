@@ -104,6 +104,16 @@ enum IntegrityChecker {
 
     /// Main entry: gọi ở `App.init()` / `Scene` boot. Nếu bất kỳ check
     /// nào fail → kill app.
+    ///
+    /// iPhone 8 Plus / iOS 15.x user hầu hết phải jailbreak để cài được app
+    /// patch. Vì vậy jailbreak check được TẮT hoàn toàn (không kill) — chỉ
+    /// log NSLog để admin biết thiết bị có jailbreak. Các check tamper khác
+    /// (baseURL integrity, bundle ID) vẫn hoạt động bình thường.
+    ///
+    /// Nếu trong tương lai muốn bật lại jailbreak check, sửa `JAILBREAK_FORCE_OK`
+    /// từ `true` → `false`.
+    static let JAILBREAK_FORCE_OK: Bool = true
+
     static func runStartupChecks() {
         if let r = verifyBaseURL(PatchHubService.baseURL) {
             kill(reason: r)
@@ -112,7 +122,12 @@ enum IntegrityChecker {
             kill(reason: r)
         }
         if isJailbroken() {
-            kill(reason: "jailbroken device")
+            if JAILBREAK_FORCE_OK {
+                // Cho phép chạy tiếp, chỉ ghi log để admin tracking.
+                NSLog("[IntegrityChecker] jailbreak detected but allowed (JAILBREAK_FORCE_OK=true)")
+            } else {
+                kill(reason: "jailbroken device")
+            }
         }
     }
 }

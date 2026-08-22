@@ -64,8 +64,8 @@ struct PatchProjectsView: View {
                 .accessibilityLabel(language.text("patch.add"))
             }
         }
-        .toolbarBackground(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+        .toolbarBackgroundCompat(.visible, for: .navigationBar)
         .sheet(isPresented: $showImporter) {
             FileDocumentPicker(
                 allowedContentTypes: PatchPackagePickerPolicy.allowedContentTypes,
@@ -247,7 +247,7 @@ struct PatchUnlockView: View {
     @State private var password = ""
 
     var body: some View {
-        NavigationStack {
+        NavigationStackCompat {
             ZStack {
                 TechBackground()
                 Form {
@@ -260,7 +260,7 @@ struct PatchUnlockView: View {
                         Text(language.text("patch.password_once_message"))
                     }
                 }
-                .scrollContentBackground(.hidden)
+                .scrollContentBackgroundCompat()
             }
             .navigationTitle(language.text("patch.unlock"))
             .navigationBarTitleDisplayMode(.inline)
@@ -328,7 +328,7 @@ struct PatchProjectDetailView: View {
                 }
             }
             .listStyle(.insetGrouped)
-            .scrollContentBackground(.hidden)
+            .scrollContentBackgroundCompat()
         }
         .navigationTitle(item?.project?.name ?? language.text("patch.title"))
         .navigationBarTitleDisplayMode(.inline)
@@ -370,8 +370,8 @@ struct PatchProjectDetailView: View {
                 }
             }
         }
-        .toolbarBackground(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+        .toolbarBackgroundCompat(.visible, for: .navigationBar)
         .task { await loadInitialStates() }
         .sheet(isPresented: $showEditor) {
             if let item, let project = item.project {

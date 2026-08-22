@@ -63,8 +63,8 @@ struct GamePatchesView: View {
                 }
             }
         }
-        .toolbarBackground(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+        .toolbarBackgroundCompat(.visible, for: .navigationBar)
         .task {
             await sync()
             await loadProjectStates()

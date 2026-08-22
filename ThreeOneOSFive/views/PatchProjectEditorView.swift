@@ -27,7 +27,7 @@ struct PatchProjectEditorView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStackCompat {
             ZStack {
                 TechBackground()
                 Form {
@@ -91,12 +91,12 @@ struct PatchProjectEditorView: View {
                         }
                     }
                 }
-                .scrollContentBackground(.hidden)
+                .scrollContentBackgroundCompat()
             }
             .navigationTitle(language.text(existingProject == nil ? "patch.new" : "patch.edit"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+            .toolbarBackgroundCompat(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(language.text("common.cancel")) { dismiss() }
@@ -207,7 +207,7 @@ struct PatchRuleEditorView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStackCompat {
             ZStack {
                 TechBackground()
                 Form {
@@ -335,12 +335,12 @@ struct PatchRuleEditorView: View {
                         }
                     }
                 }
-                .scrollContentBackground(.hidden)
+                .scrollContentBackgroundCompat()
             }
             .navigationTitle(language.text(originalRule == nil ? "patch.add_rule" : "patch.edit_rule"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+            .toolbarBackgroundCompat(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(language.text("common.cancel")) { dismiss() }

@@ -76,8 +76,8 @@ struct FileBrowserView: View {
             }
             .listStyle(.plain)
             .environment(\.defaultMinListRowHeight, 44)
-            .scrollContentBackground(.hidden)
-            .scrollDismissesKeyboard(.interactively)
+            .scrollContentBackgroundCompat()
+            .scrollDismissesKeyboardCompat()
             .overlay {
                 Group {
                     switch overlayState {
@@ -99,8 +99,8 @@ struct FileBrowserView: View {
         }
         .navigationTitle(currentPath == containerPath ? title : (currentPath as NSString).lastPathComponent)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+        .toolbarBackgroundCompat(.visible, for: .navigationBar)
         .searchable(
             text: $fileSearchText,
             placement: .navigationBarDrawer(displayMode: .always),
@@ -1128,8 +1128,8 @@ struct FileReaderView: View {
         }
         .navigationTitle(file.name)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+        .toolbarBackgroundCompat(.visible, for: .navigationBar)
         .onAppear {
             DispatchQueue.global(qos: .userInitiated).async {
                 let c = ContainerStore.readTextFile(at: file.path)

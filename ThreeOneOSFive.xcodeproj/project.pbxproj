@@ -67,6 +67,7 @@
 		3105BO01 /* BuildBlockedOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3105BO02; };
 		3105ST01 /* SupportStatusToast.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3105ST02; };
 		3105AB01 /* AppBranding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3105AB02; };
+		3105AC01 /* AppCompat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3105AC02; };
 		3105A228 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 3105A120; };
 		3105A211 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3105A031; };
 /* End PBXBuildFile section */
@@ -145,6 +146,7 @@
 		3105BO02 /* BuildBlockedOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuildBlockedOverlay.swift; sourceTree = "<group>"; };
 		3105ST02 /* SupportStatusToast.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportStatusToast.swift; sourceTree = "<group>"; };
 		3105AB02 /* AppBranding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBranding.swift; sourceTree = "<group>"; };
+		3105AC02 /* AppCompat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppCompat.swift; sourceTree = "<group>"; };
 		3105L015 /* LicenseGateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LicenseGateView.swift; sourceTree = "<group>"; };
 		3105K002 /* KeyCountdownFooter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyCountdownFooter.swift; sourceTree = "<group>"; };
 		3105L017 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
@@ -213,6 +215,7 @@
 		3105A404 /* views */ = {
 			isa = PBXGroup;
 			children = (
+				3105AC02 /* AppCompat.swift */,
 				3105A098 /* DesignSystem.swift */,
 				3105A023 /* SettingsView.swift */,
 				3105A024 /* LogView.swift */,
@@ -411,6 +414,7 @@
 				3105BO01,
 				3105ST01,
 				3105AB01,
+				3105AC01,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -447,7 +451,7 @@
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -480,7 +484,7 @@
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -548,7 +552,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -604,7 +608,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
