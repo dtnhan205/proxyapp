@@ -22,20 +22,16 @@
 "dashboard.device_name" = "Tên thiết bị";
 "dashboard.hardware_model" = "Model phần cứng";
 "dashboard.access_footer" = "App chỉ báo thành công sau khi tệp hệ thống thực sự mở được ở chế độ đọc và ghi.";
-"dashboard.unsupported_footer" = "iOS %@ (%@) nằm ngoài phạm vi bad_query đã xác minh. Hỗ trợ: iOS 17.0–17.7.x, iOS 18.0–18.7.1, iOS 26.0–26.6.1 và iOS 27 beta 1–4.";
+"dashboard.unsupported_footer" = "iOS %@ (%@) nằm ngoài phạm vi bad_query đã xác minh. Hỗ trợ: iOS 15.0–15.8.5 (thử nghiệm), iOS 16.0–16.7.12 (thử nghiệm), iOS 17.0–17.7.x, iOS 18.0–18.7.1, iOS 26.0–26.6.1 và iOS 27 beta 1–4.";
 "dashboard.app_browser" = "Duyệt dữ liệu ứng dụng";
 "dashboard.browser" = "Trình duyệt file";
 "dashboard.open_browser" = "Mở trình duyệt file";
 "dashboard.browser_footer" = "Duyệt và đọc dữ liệu từ mọi ứng dụng và system container trên thiết bị.";
 "dashboard.device_actions_warning" = "Hãy lưu thay đổi trước khi khởi động lại thiết bị.";
 "dashboard.unsupported_device" = "Thiết bị không được hỗ trợ";
-"dashboard.unsupported_message" = "iOS %@ chưa được hỗ trợ.\n\nCác phiên bản hiện được hỗ trợ:\n• iOS 17.0–17.7.x\n• iOS 18.0–18.7.1\n• iOS 26.x\n• iOS 27.0 beta 1–4";
+"dashboard.unsupported_message" = "iOS %@ chưa được hỗ trợ.\n\nCác phiên bản hiện được hỗ trợ:\n• iOS 15.0–15.8.5 (thử nghiệm, offset xác minh một phần)\n• iOS 16.0–16.7.12 (thử nghiệm, offset xác minh một phần)\n• iOS 17.0–17.7.x\n• iOS 18.0–18.7.1\n• iOS 26.x\n• iOS 27.0 beta 1–4";
 "dashboard.installation" = "Cài đặt ứng dụng";
 "dashboard.enterprise_signing" = "ProxyVipVn V2 chỉ hoạt động khi được ký bằng chứng chỉ doanh nghiệp. Không hỗ trợ SideStore, AltStore, 3uTools hoặc LiveContainer.";
-"tab.home" = "ProxyVipVn V2";
-"tab.files" = "Tệp";
-"tab.patches" = "Patch";
-"tab.settings" = "Cài đặt";
 
 "patch.title" = "Patch";
 "patch.my_patches" = "Dự án của tôi";
@@ -53,7 +49,7 @@
 "patch.tap_to_unlock" = "Chạm để nhập mật khẩu";
 "patch.password_protected" = "Có mật khẩu bảo vệ";
 "patch.rules_count" = "%lld quy tắc thay thế";
-"patch.menu_title" = "Menu Patch";
+"patch.menu_title" = "PROXY PATCH";
 "patch.menu_auto_badge" = "AUTO";
 "patch.toggle_on_success" = "Đã bật %@";
 "patch.toggle_off_success" = "Đã tắt %@";
@@ -162,8 +158,8 @@
 "settings.current_version" = "Phiên bản hiện tại";
 "settings.verified_versions" = "Phiên bản đã xác minh";
 "settings.beta_build" = "Beta %lld · %@";
-"settings.supported_range_summary" = "Đã xác minh: iOS 17.0–17.7.x, iOS 18.0–18.7.1, iOS 26.0–26.6.1 và bốn build iOS 27.0 beta được liệt kê.";
-"settings.supported_versions_footer" = "Chỉ các build liệt kê ở trên được bật. iOS 18.7.2–18.7.7 và iOS 27 beta 5 trở lên sẽ được đánh dấu không hỗ trợ.";
+"settings.supported_range_summary" = "Đã xác minh: iOS 15.0–15.8.5 (thử nghiệm), iOS 16.0–16.7.12 (thử nghiệm), iOS 17.0–17.7.x, iOS 18.0–18.7.1, iOS 26.0–26.6.1 và bốn build iOS 27.0 beta được liệt kê.";
+"settings.supported_versions_footer" = "Chỉ các build liệt kê ở trên được bật. Offset iOS 15.x/16.x được xác minh một phần — khuyến nghị dump kernelcache trước khi dùng production. iOS 18.7.2–18.7.7 và iOS 27 beta 5 trở lên sẽ được đánh dấu không hỗ trợ.";
 "settings.sandbox_token" = "Token sandbox";
 "settings.generate_token" = "Tạo token";
 "settings.token_footer" = "Khả dụng sau khi exploit cấp quyền thành công.";
@@ -312,7 +308,6 @@
 "browser.import_cancelled_title" = "Đã hủy import";
 "browser.import_summary" = "%lld tệp mới, %lld tệp đã thay thế, %lld tệp lỗi.";
 
-"tab.wallpapers" = "Hình nền";
 "wallpaper.title" = "Wallpaper Lab";
 "wallpaper.access" = "Quyền PosterBoard";
 "wallpaper.access_ready" = "Sẵn sàng cài đặt";
@@ -381,3 +376,7 @@
 "wallpaper.error.install" = "Cài đặt thất bại và mọi descriptor đã thêm trong lần thử này đã được rollback.";
 "wallpaper.error.restore" = "ProxyVipVn V2 không thể xóa an toàn toàn bộ descriptor của lần cài này.";
 "wallpaper.error.unknown" = "Đã xảy ra lỗi không mong muốn. Hãy kiểm tra Nhật ký phiên để biết chi tiết.";
+"support_toast.supported_title" = "SẴN SÀNG · iOS %@";
+"support_toast.supported_subtitle" = "ProxyVipVn đã xác minh cho bản này — quyền truy cập đầy đủ được mở.";
+"support_toast.unsupported_title" = "KHÔNG HỖ TRỢ · iOS %@";
+"support_toast.unsupported_subtitle" = "Bản iOS này nằm ngoài phạm vi hỗ trợ của app.";

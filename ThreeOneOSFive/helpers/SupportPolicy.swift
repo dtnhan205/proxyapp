@@ -1,6 +1,8 @@
 import Foundation
 
 enum ExploitSupportPolicy {
+    static let verifiedIOS15Range = "15.0–15.8.5 (experimental)"
+    static let verifiedIOS16Range = "16.0–16.7.12 (experimental)"
     static let verifiedIOS17Range = "17.0–17.7.x"
     static let verifiedIOS18Range = "18.0–18.7.x"
     static let verifiedIOS26Range = "26.0–26.6.1"
@@ -17,6 +19,16 @@ enum ExploitSupportPolicy {
     }
 
     static func isSupported(major: Int, minor: Int, patch: Int, build: String) -> Bool {
+        // iOS 15.x: 15.0 – 15.8.5 (experimental — offsets partially verified)
+        if major == 15 {
+            guard minor >= 0, minor <= 8 else { return false }
+            return minor < 8 || (minor == 8 && patch <= 5)
+        }
+        // iOS 16.x: 16.0 – 16.7.12 (experimental — offsets partially verified)
+        if major == 16 {
+            guard minor >= 0, minor <= 7 else { return false }
+            return minor < 7 || (minor == 7 && patch <= 12)
+        }
         // iOS 17.x: 17.0 – 17.7.x
         if major == 17 {
             guard minor >= 0, minor <= 7 else { return false }

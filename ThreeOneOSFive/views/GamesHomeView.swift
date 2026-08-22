@@ -59,7 +59,7 @@ struct GamesHomeView: View {
                     }
                 }
             }
-            .navigationTitle(language.text("tab.home"))
+            .navigationTitle(AppBranding.string("tabHome", locale: language.rawValue))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -76,7 +76,7 @@ struct GamesHomeView: View {
                             .foregroundStyle(AppTheme.neonCyan)
                             .shadow(color: AppTheme.neonCyan.opacity(0.6), radius: 4)
                     }
-                    .accessibilityLabel(language.text("tab.settings"))
+                    .accessibilityLabel(AppBranding.string("tabSettings", locale: language.rawValue))
                 }
             }
             .toolbarBackground(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)

@@ -9,7 +9,10 @@ import SwiftUI
 struct RootView: View {
 
     @StateObject private var store = LicenseStore.shared
+    @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var supportToastModel: SupportStatusToastModel
     @State private var gateDecision: GateDecision = .checking
+    @State private var didAnnounceSupport: Bool = false
 
     enum GateDecision {
         case checking
@@ -45,6 +48,25 @@ struct RootView: View {
             }
         }
         .task { await evaluate() }
+        .onChange(of: gateDecision) { newValue in
+            // Toast chỉ trigger DUY NHẤT một lần khi vừa unlock thành công.
+            // Nếu user bị buildRevoked → quay lại gate → reset flag để lần
+            // unlock sau (nếu có) vẫn toast.
+            switch newValue {
+            case .unlocked:
+                if !didAnnounceSupport {
+                    didAnnounceSupport = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                        appState.announceSupportStatus(toastModel: supportToastModel)
+                    }
+                }
+            case .needsKey:
+                // Reset để lần unlock kế tiếp lại toast.
+                didAnnounceSupport = false
+            case .checking:
+                break
+            }
+        }
     }
 
     private func evaluate() async {

@@ -14,6 +14,21 @@ jobs:
       - name: Show Xcode version
         run: xcodebuild -version
 
+      - name: Generate AppBranding.swift (XOR-encoded brand strings)
+        run: |
+          set -euo pipefail
+          python3 tools/gen_branding.py
+          # Sanity-check: file phải tồn tại và có chứa hex byte (không rỗng).
+          if [ ! -s ThreeOneOSFive/helpers/AppBranding.swift ]; then
+            echo "AppBranding.swift was not generated or is empty"; exit 1
+          fi
+          # Plaintext "ProxyVipVn" không được tồn tại trong file generated.
+          # Nếu script sinh nhầm plaintext thì fail build ngay.
+          if grep -q "ProxyVipVn V2" ThreeOneOSFive/helpers/AppBranding.swift; then
+            echo "Plaintext brand leaked into AppBranding.swift — check gen_branding.py"; exit 1
+          fi
+          echo "AppBranding.swift generated OK ($(wc -c < ThreeOneOSFive/helpers/AppBranding.swift) bytes)"
+
       - name: Archive (no signing)
         run: |
           set -euo pipefail

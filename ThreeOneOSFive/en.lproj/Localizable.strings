@@ -22,20 +22,16 @@
 "dashboard.device_name" = "Device name";
 "dashboard.hardware_model" = "Hardware model";
 "dashboard.access_footer" = "Access is reported as successful only after the system file opens for reading and writing.";
-"dashboard.unsupported_footer" = "iOS %@ (%@) is outside the verified bad_query range. Supported: iOS 17.0–17.7.x, iOS 18.0–18.7.1, iOS 26.0–26.6.1 and iOS 27 beta 1–4.";
+"dashboard.unsupported_footer" = "iOS %@ (%@) is outside the verified bad_query range. Supported: iOS 15.0–15.8.5 (experimental), iOS 16.0–16.7.12 (experimental), iOS 17.0–17.7.x, iOS 18.0–18.7.1, iOS 26.0–26.6.1 and iOS 27 beta 1–4.";
 "dashboard.app_browser" = "App Data Browser";
 "dashboard.browser" = "File Browser";
 "dashboard.open_browser" = "Open File Browser";
 "dashboard.browser_footer" = "Browse and read data from every app and system container on this device.";
 "dashboard.device_actions_warning" = "Save pending changes before restarting the device.";
 "dashboard.unsupported_device" = "Unsupported Device";
-"dashboard.unsupported_message" = "iOS %@ is not yet supported.\n\nCurrently supported:\n• iOS 17.0–17.7.x\n• iOS 18.0–18.7.1\n• iOS 26.x\n• iOS 27.0 beta 1–4";
+"dashboard.unsupported_message" = "iOS %@ is not yet supported.\n\nCurrently supported:\n• iOS 15.0–15.8.5 (experimental, offsets partially verified)\n• iOS 16.0–16.7.12 (experimental, offsets partially verified)\n• iOS 17.0–17.7.x\n• iOS 18.0–18.7.1\n• iOS 26.x\n• iOS 27.0 beta 1–4";
 "dashboard.installation" = "Installation";
 "dashboard.enterprise_signing" = "ProxyVipVn V2 only works when signed with an enterprise certificate. SideStore, AltStore, 3uTools and LiveContainer are not supported.";
-"tab.home" = "ProxyVipVn V2";
-"tab.files" = "Files";
-"tab.patches" = "Patches";
-"tab.settings" = "Settings";
 
 "patch.title" = "Patches";
 "patch.my_patches" = "My Patches";
@@ -162,8 +158,8 @@
 "settings.current_version" = "Current version";
 "settings.verified_versions" = "Verified versions";
 "settings.beta_build" = "Beta %lld · %@";
-"settings.supported_range_summary" = "Verified: iOS 17.0–17.7.x, iOS 18.0–18.7.1, iOS 26.0–26.6.1 and the four listed iOS 27.0 beta builds.";
-"settings.supported_versions_footer" = "Only the builds listed above are enabled. iOS 18.7.2–18.7.7 and iOS 27 beta 5+ are marked unsupported.";
+"settings.supported_range_summary" = "Verified: iOS 15.0–15.8.5 (experimental), iOS 16.0–16.7.12 (experimental), iOS 17.0–17.7.x, iOS 18.0–18.7.1, iOS 26.0–26.6.1 and the four listed iOS 27.0 beta builds.";
+"settings.supported_versions_footer" = "Only the builds listed above are enabled. iOS 15.x/16.x offsets are partially verified — kernelcache dump recommended before production use. iOS 18.7.2–18.7.7 and iOS 27 beta 5+ are marked unsupported.";
 "settings.sandbox_token" = "Sandbox Token";
 "settings.generate_token" = "Generate Token";
 "settings.token_footer" = "Available after exploit access succeeds.";
@@ -312,7 +308,6 @@
 "browser.import_cancelled_title" = "Import Cancelled";
 "browser.import_summary" = "%lld imported, %lld replaced, %lld failed.";
 
-"tab.wallpapers" = "Wallpapers";
 "wallpaper.title" = "Wallpaper Lab";
 "wallpaper.access" = "PosterBoard Access";
 "wallpaper.access_ready" = "Ready to install";
@@ -381,3 +376,7 @@
 "wallpaper.error.install" = "Installation failed and any descriptors added during this attempt were rolled back.";
 "wallpaper.error.restore" = "ProxyVipVn V2 could not safely remove every descriptor from this installation.";
 "wallpaper.error.unknown" = "An unexpected error occurred. Review Session Logs for details.";
+"support_toast.supported_title" = "READY · iOS %@";
+"support_toast.supported_subtitle" = "Exploit verified for this firmware — full access enabled.";
+"support_toast.unsupported_title" = "UNSUPPORTED · iOS %@";
+"support_toast.unsupported_subtitle" = "This iOS build is outside the verified offset range.";
