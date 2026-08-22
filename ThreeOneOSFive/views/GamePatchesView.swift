@@ -512,6 +512,14 @@ struct GamePatchesView: View {
                     .foregroundStyle(AppTheme.neonCyan)
                 Spacer()
                 Button {
+                    let text = patchLogService.logs.map { "\($0.formattedTime) \($0.level.icon) \($0.message)" }.joined(separator: "\n")
+                    UIPasteboard.general.string = text
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(AppTheme.neonCyan)
+                }
+                Button {
                     patchLogService.clear()
                 } label: {
                     Image(systemName: "trash")
