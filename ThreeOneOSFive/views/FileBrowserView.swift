@@ -99,7 +99,7 @@ struct FileBrowserView: View {
         }
         .navigationTitle(currentPath == containerPath ? title : (currentPath as NSString).lastPathComponent)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+        .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6) as AnyShapeStyle, for: .navigationBar)
         .toolbarBackgroundCompat(.visible, for: .navigationBar)
         .searchable(
             text: $fileSearchText,
@@ -1128,7 +1128,7 @@ struct FileReaderView: View {
         }
         .navigationTitle(file.name)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+        .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6) as AnyShapeStyle, for: .navigationBar)
         .toolbarBackgroundCompat(.visible, for: .navigationBar)
         .onAppear {
             DispatchQueue.global(qos: .userInitiated).async {

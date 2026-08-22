@@ -22,7 +22,7 @@ struct SettingsView: View {
         .tint(AppTheme.neonCyan)
         .navigationTitle(language.text("settings.title"))
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+        .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6) as AnyShapeStyle, for: .navigationBar)
         .toolbarBackgroundCompat(.visible, for: .navigationBar)
     }
 
@@ -91,7 +91,7 @@ struct SettingsView: View {
                         )
                         Text(language.text(appState.isSupported ? "settings.supported" : "settings.unsupported"))
                             .font(.caption.weight(.bold))
-                            .tracking(1.0)
+                            .trackingCompat(1.0)
                             .textCase(.uppercase)
                             .foregroundStyle(appState.isSupported ? AppTheme.neonLime : AppTheme.neonMagenta)
                     }

@@ -79,7 +79,7 @@ struct GamesHomeView: View {
                     .accessibilityLabel(AppBranding.string("tabSettings", locale: language.rawValue))
                 }
             }
-            .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+            .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6) as AnyShapeStyle, for: .navigationBar)
             .toolbarBackgroundCompat(.visible, for: .navigationBar)
             .refreshable { await loadGames() }
             .task { await loadGames() }

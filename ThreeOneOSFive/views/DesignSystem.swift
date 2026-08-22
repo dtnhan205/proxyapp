@@ -368,7 +368,7 @@ struct NeonSectionHeader: View {
             Text(title)
                 .font(.subheadline.weight(.heavy))
                 .textCase(.uppercase)
-                .tracking(0.6)
+                .trackingCompat(0.6)
                 .foregroundStyle(.primary)
             Spacer()
         }
@@ -536,7 +536,7 @@ struct NeonReadout: View {
     var body: some View {
         Text(text)
             .font(.caption2.weight(.bold))
-            .tracking(1.6)
+            .trackingCompat(1.6)
             .textCase(.uppercase)
             .foregroundStyle(tint)
             .shadow(color: tint.opacity(0.6), radius: 4)

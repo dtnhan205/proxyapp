@@ -78,7 +78,7 @@ struct LogView: View {
             }
             .navigationTitle(language.text("logs.title"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+            .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6) as AnyShapeStyle, for: .navigationBar)
             .toolbarBackgroundCompat(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -88,7 +88,7 @@ struct LogView: View {
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(language.text("common.done")) { dismiss() }
-                        .fontWeight(.semibold)
+                        .fontWeightCompat(.semibold)
                         .foregroundStyle(AppTheme.neonCyan)
                 }
             }

@@ -64,7 +64,7 @@ struct PatchProjectsView: View {
                 .accessibilityLabel(language.text("patch.add"))
             }
         }
-        .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+        .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6) as AnyShapeStyle, for: .navigationBar)
         .toolbarBackgroundCompat(.visible, for: .navigationBar)
         .sheet(isPresented: $showImporter) {
             FileDocumentPicker(
@@ -120,11 +120,11 @@ struct PatchProjectsView: View {
                     .font(.subheadline.weight(.heavy))
                     .foregroundStyle(.primary)
                     .textCase(.uppercase)
-                    .tracking(0.6)
+                    .trackingCompat(0.6)
                 Spacer()
                 Text("\(store.items.count)")
                     .font(.caption2.weight(.bold))
-                    .tracking(1.2)
+                    .trackingCompat(1.2)
                     .foregroundStyle(AppTheme.neonCyan)
                     .padding(.horizontal, 9)
                     .padding(.vertical, 4)
@@ -304,6 +304,49 @@ struct PatchProjectDetailView: View {
         DevicePatchService.latestReceipt(projectID: projectID)
     }
 
+    /// Toolbar content — explicit `@ToolbarContentBuilder` tránh "ambiguous
+    /// use of toolbar(content:)" trên iOS 15 (compiler không thể suy ra
+    /// kiểu closure giữa View vs ToolbarContent).
+    @ToolbarContentBuilder
+    private var toolbarItems: some ToolbarContent {
+        ToolbarItem(placement: .navigationBarTrailing) {
+            if isWorking {
+                HStack(spacing: 6) {
+                    PulsingDot(color: AppTheme.neonCyan, size: 6)
+                    ProgressView()
+                        .tint(AppTheme.neonCyan)
+                }
+            } else if let item {
+                Menu {
+                    Button {
+                        showEditor = true
+                    } label: {
+                        Label(language.text("patch.edit"), systemImage: "pencil")
+                    }
+                    Button {
+                        showApplyConfirmation = true
+                    } label: {
+                        Label(language.text("patch.apply"), systemImage: "checkmark.shield.fill")
+                    }
+                    if receipt != nil {
+                        Button(role: .destructive) {
+                            showRestoreConfirmation = true
+                        } label: {
+                            Label(language.text("patch.restore"), systemImage: "arrow.uturn.backward.circle")
+                        }
+                    }
+                    ShareLink(item: item.packageURL) {
+                        Label(language.text("patch.export"), systemImage: "square.and.arrow.up")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .foregroundStyle(AppTheme.neonCyan)
+                        .shadow(color: AppTheme.neonCyan.opacity(0.5), radius: 4)
+                }
+            }
+        }
+    }
+
     var body: some View {
         ZStack {
             TechBackground()
@@ -332,45 +375,8 @@ struct PatchProjectDetailView: View {
         }
         .navigationTitle(item?.project?.name ?? language.text("patch.title"))
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                if isWorking {
-                    HStack(spacing: 6) {
-                        PulsingDot(color: AppTheme.neonCyan, size: 6)
-                        ProgressView()
-                            .tint(AppTheme.neonCyan)
-                    }
-                } else if let item {
-                    Menu {
-                        Button {
-                            showEditor = true
-                        } label: {
-                            Label(language.text("patch.edit"), systemImage: "pencil")
-                        }
-                        Button {
-                            showApplyConfirmation = true
-                        } label: {
-                            Label(language.text("patch.apply"), systemImage: "checkmark.shield.fill")
-                        }
-                        if receipt != nil {
-                            Button(role: .destructive) {
-                                showRestoreConfirmation = true
-                            } label: {
-                                Label(language.text("patch.restore"), systemImage: "arrow.uturn.backward.circle")
-                            }
-                        }
-                        ShareLink(item: item.packageURL) {
-                            Label(language.text("patch.export"), systemImage: "square.and.arrow.up")
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                            .foregroundStyle(AppTheme.neonCyan)
-                            .shadow(color: AppTheme.neonCyan.opacity(0.5), radius: 4)
-                    }
-                }
-            }
-        }
-        .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+        .toolbar(content: toolbarItems)
+        .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6) as AnyShapeStyle, for: .navigationBar)
         .toolbarBackgroundCompat(.visible, for: .navigationBar)
         .task { await loadInitialStates() }
         .sheet(isPresented: $showEditor) {

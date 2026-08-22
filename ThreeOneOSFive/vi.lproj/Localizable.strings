@@ -50,7 +50,7 @@
 "patch.password_protected" = "Có mật khẩu bảo vệ";
 "patch.rules_count" = "%lld quy tắc thay thế";
 "patch.menu_title" = "PROXY PATCH";
-"patch.menu_auto_badge" = "AUTO";
+"patch.menu_auto_badge" = "VIP VN";
 "patch.toggle_on_success" = "Đã bật %@";
 "patch.toggle_off_success" = "Đã tắt %@";
 "patch.project" = "Dự án";

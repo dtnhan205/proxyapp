@@ -63,7 +63,7 @@ struct GamePatchesView: View {
                 }
             }
         }
-        .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+        .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6) as AnyShapeStyle, for: .navigationBar)
         .toolbarBackgroundCompat(.visible, for: .navigationBar)
         .task {
             await sync()
@@ -140,20 +140,20 @@ struct GamePatchesView: View {
                 .font(.subheadline.weight(.heavy))
                 .foregroundStyle(.primary)
                 .textCase(.uppercase)
-                .tracking(0.6)
+                .trackingCompat(0.6)
             Spacer()
             if isSyncing {
                 HStack(spacing: 6) {
                     PulsingDot(color: AppTheme.neonCyan, size: 6)
                     Text(language.text("patch.menu_auto_badge"))
                         .font(.caption2.weight(.bold))
-                        .tracking(1.2)
+                        .trackingCompat(1.2)
                         .foregroundStyle(AppTheme.neonCyan)
                 }
             } else {
                 Text(language.text("patch.menu_auto_badge"))
                     .font(.caption2.weight(.bold))
-                    .tracking(1.2)
+                    .trackingCompat(1.2)
                     .foregroundStyle(AppTheme.neonCyan)
                     .padding(.horizontal, 9)
                     .padding(.vertical, 4)

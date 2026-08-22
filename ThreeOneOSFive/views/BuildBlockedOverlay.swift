@@ -52,7 +52,7 @@ struct BuildBlockedOverlay: View {
                             .textInputAutocapitalization(.characters)
                             .autocorrectionDisabled(true)
                             .font(.system(size: 15, weight: .medium, design: .monospaced))
-                            .tracking(1.2)
+                            .trackingCompat(1.2)
                             .foregroundColor(.white)
                             .padding(.vertical, 12)
                             .padding(.horizontal, 14)
@@ -74,7 +74,7 @@ struct BuildBlockedOverlay: View {
                                 }
                                 Text(isBusy ? "Đang xác thực…" : "Kích hoạt lại")
                                     .font(.system(size: 15, weight: .semibold, design: .monospaced))
-                                    .tracking(1.5)
+                                    .trackingCompat(1.5)
                                     .foregroundColor(.white)
                             }
                             .frame(maxWidth: .infinity)

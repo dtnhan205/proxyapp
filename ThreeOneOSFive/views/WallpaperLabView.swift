@@ -41,7 +41,7 @@ struct WallpaperLabView: View {
             }
             .navigationTitle(language.text("wallpaper.title"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+            .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6) as AnyShapeStyle, for: .navigationBar)
             .toolbarBackgroundCompat(.visible, for: .navigationBar)
             .toolbar { toolbarContent }
             .overlay { busyOverlay }
@@ -206,9 +206,11 @@ struct WallpaperLabView: View {
 
     private var resetSection: some View {
         Section {
-            LabeledContent(language.text("wallpaper.installed_by_3105")) {
+            LabeledContentCompat {
                 Text("\(activeReceipts.reduce(0) { $0 + $1.installedDescriptors.count })")
                     .monospacedDigit()
+            } label: {
+                Text(language.text("wallpaper.installed_by_3105"))
             }
             Button(role: .destructive) {
                 alert = WallpaperLabAlert(kind: .reset(activeReceipts))
@@ -247,7 +249,7 @@ struct WallpaperLabView: View {
             }
         } label: {
             Label(language.text("wallpaper.install"), systemImage: "square.and.arrow.down")
-                .fontWeight(.semibold)
+                .fontWeightCompat(.semibold)
                 .frame(maxWidth: .infinity, minHeight: 44)
         }
         .buttonStyle(.plain)

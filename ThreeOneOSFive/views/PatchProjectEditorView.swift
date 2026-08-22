@@ -95,7 +95,7 @@ struct PatchProjectEditorView: View {
             }
             .navigationTitle(language.text(existingProject == nil ? "patch.new" : "patch.edit"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+            .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6) as AnyShapeStyle, for: .navigationBar)
             .toolbarBackgroundCompat(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -263,12 +263,14 @@ struct PatchRuleEditorView: View {
                             }
                         }
                         if !replacementFilename.isEmpty {
-                            LabeledContent(
-                                language.text("patch.file_size"),
-                                value: ByteCountFormatter.string(
-                                    fromByteCount: Int64(replacementData.count),
-                                    countStyle: .file
-                                )
+                            LabeledContentCompat(
+                                label: { Text(language.text("patch.file_size")) },
+                                value: {
+                                    Text(ByteCountFormatter.string(
+                                        fromByteCount: Int64(replacementData.count),
+                                        countStyle: .file
+                                    ))
+                                }
                             )
                         }
                     }
@@ -309,12 +311,14 @@ struct PatchRuleEditorView: View {
                             }
                         }
                         if let originalData {
-                            LabeledContent(
-                                language.text("patch.file_size"),
-                                value: ByteCountFormatter.string(
-                                    fromByteCount: Int64(originalData.count),
-                                    countStyle: .file
-                                )
+                            LabeledContentCompat(
+                                label: { Text(language.text("patch.file_size")) },
+                                value: {
+                                    Text(ByteCountFormatter.string(
+                                        fromByteCount: Int64(originalData.count),
+                                        countStyle: .file
+                                    ))
+                                }
                             )
                             Button(role: .destructive) {
                                 self.originalData = nil
@@ -339,7 +343,7 @@ struct PatchRuleEditorView: View {
             }
             .navigationTitle(language.text(originalRule == nil ? "patch.add_rule" : "patch.edit_rule"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+            .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6) as AnyShapeStyle, for: .navigationBar)
             .toolbarBackgroundCompat(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
