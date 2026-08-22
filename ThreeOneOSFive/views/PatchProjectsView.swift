@@ -375,7 +375,7 @@ struct PatchProjectDetailView: View {
         }
         .navigationTitle(item?.project?.name ?? language.text("patch.title"))
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar(content: toolbarItems)
+        .toolbar { toolbarItems }
         .toolbarBackground(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .task { await loadInitialStates() }

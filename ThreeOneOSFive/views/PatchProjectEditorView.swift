@@ -226,7 +226,7 @@ struct PatchRuleEditorView: View {
                         Text(language.text("patch.bundle_not_uuid_footer"))
                     }
 
-                    Section(language.text("patch.replacement_file")) {
+                    Section {
                         Button {
                             showFileImporter = true
                         } label: {
@@ -273,6 +273,8 @@ struct PatchRuleEditorView: View {
                                 }
                             )
                         }
+                    } header: {
+                        Text(language.text("patch.replacement_file"))
                     }
 
                     Section {
