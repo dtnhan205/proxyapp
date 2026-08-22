@@ -12,6 +12,7 @@ struct ThreeOneOSFiveApp: App {
     }
 
     init() {
+        setupLogCapture()
         // Chạy ngay khi app mở. Mọi chỉnh sửa binary (đổi URL, hook
         // Obfuscated, rebrand bundle ID, jailbreak) → kill.
         IntegrityChecker.runStartupChecks()

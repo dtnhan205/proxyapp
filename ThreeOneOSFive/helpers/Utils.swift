@@ -3,6 +3,37 @@ import UIKit
 import Darwin
 import Combine
 
+// MARK: - Log capture for C code stdout/stderr
+private var logCapturePipe: Pipe?
+
+func setupLogCapture() {
+    guard logCapturePipe == nil else { return }
+    let pipe = Pipe()
+    logCapturePipe = pipe
+
+    setvbuf(stdout, nil, _IONBF, 0)
+    setvbuf(stderr, nil, _IONBF, 0)
+    let writeFd = pipe.fileHandleForWriting.fileDescriptor
+    if dup2(writeFd, STDOUT_FILENO) < 0 || dup2(writeFd, STDERR_FILENO) < 0 {
+        print("[Utils] setupLogCapture: dup2 failed")
+        logCapturePipe = nil
+        return
+    }
+
+    pipe.fileHandleForReading.readabilityHandler = { handle in
+        let data = handle.availableData
+        guard !data.isEmpty else { return }
+        if let text = String(data: data, encoding: .utf8) {
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                DispatchQueue.main.async {
+                    AppLog.shared.append(trimmed)
+                }
+            }
+        }
+    }
+}
+
 // MARK: - Global logger
 class AppLog: ObservableObject {
     static let shared = AppLog()
@@ -14,7 +45,6 @@ class AppLog: ObservableObject {
 }
 func log(_ msg: String) {
     AppLog.shared.append(msg)
-    // Also write to PatchLogService if available
     Task { @MainActor in
         PatchLogService.shared.debug(msg)
     }
