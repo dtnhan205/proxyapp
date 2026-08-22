@@ -22,7 +22,7 @@
 "dashboard.device_name" = "设备名称";
 "dashboard.hardware_model" = "硬件型号";
 "dashboard.access_footer" = "只有成功以读写模式打开系统文件后，才会报告权限获取成功。";
-"dashboard.unsupported_footer" = "iOS %@（%@）不在已验证的 bad_query 范围内。支持：iOS 15.0–15.8.5（实验性）、iOS 16.0–16.7.12（实验性）、iOS 17.0–17.7.x、iOS 18.0–18.7.1、iOS 26.0–26.6.1 和 iOS 27 beta 1–4。";
+"dashboard.unsupported_footer" = "iOS %@（%@）不在已验证的 bad_query 范围内。支持：iOS 16.0–16.7.12（实验性）、iOS 17.0–17.7.x、iOS 18.0–18.7.1、iOS 26.0–26.6.1 和 iOS 27 beta 1–4。";
 "dashboard.app_browser" = "应用数据浏览器";
 "dashboard.browser" = "文件浏览器";
 "dashboard.open_browser" = "打开文件浏览器";

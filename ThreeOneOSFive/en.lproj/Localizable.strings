@@ -22,7 +22,7 @@
 "dashboard.device_name" = "Device name";
 "dashboard.hardware_model" = "Hardware model";
 "dashboard.access_footer" = "Access is reported as successful only after the system file opens for reading and writing.";
-"dashboard.unsupported_footer" = "iOS %@ (%@) is outside the verified bad_query range. Supported: iOS 15.0–15.8.5 (experimental), iOS 16.0–16.7.12 (experimental), iOS 17.0–17.7.x, iOS 18.0–18.7.1, iOS 26.0–26.6.1 and iOS 27 beta 1–4.";
+"dashboard.unsupported_footer" = "iOS %@ (%@) is outside the verified bad_query range. Supported: iOS 16.0–16.7.12 (experimental), iOS 17.0–17.7.x, iOS 18.0–18.7.1, iOS 26.0–26.6.1 and iOS 27 beta 1–4.";
 "dashboard.app_browser" = "App Data Browser";
 "dashboard.browser" = "File Browser";
 "dashboard.open_browser" = "Open File Browser";

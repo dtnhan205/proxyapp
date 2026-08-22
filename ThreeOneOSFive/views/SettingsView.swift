@@ -113,13 +113,6 @@ struct SettingsView: View {
                 cyberDivider()
 
                 cyberRow(
-                    label: "iOS 15",
-                    value: ExploitSupportPolicy.verifiedIOS15Range,
-                    accent: AppTheme.neonAmber,
-                    monospace: true
-                )
-                cyberDivider()
-                cyberRow(
                     label: "iOS 16",
                     value: ExploitSupportPolicy.verifiedIOS16Range,
                     accent: AppTheme.neonAmber,
