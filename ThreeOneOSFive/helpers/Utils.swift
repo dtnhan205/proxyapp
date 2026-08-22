@@ -9,10 +9,16 @@ class AppLog: ObservableObject {
     @Published var entries: [String] = []
     func append(_ msg: String) {
         DispatchQueue.main.async { self.entries.append(msg) }
-        print("[ProxyVipVn V2]")
+        print("[ProxyVipVn V2] \(msg)")
     }
 }
-func log(_ msg: String) { AppLog.shared.append(msg) }
+func log(_ msg: String) {
+    AppLog.shared.append(msg)
+    // Also write to PatchLogService if available
+    Task { @MainActor in
+        PatchLogService.shared.debug(msg)
+    }
+}
 
 // MARK: - App Info
 enum AppInfo {

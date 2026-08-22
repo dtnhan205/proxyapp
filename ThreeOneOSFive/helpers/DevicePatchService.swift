@@ -38,11 +38,39 @@ enum DevicePatchService {
     }
 
     static func setRuleState(_ isOn: Bool, rule: PatchRule) throws {
-        try withResolvedContainers(bundleIDs: [rule.bundleID]) { roots in
-            guard let root = roots[rule.bundleID] else {
-                throw PatchPackageError.targetAppUnavailable(rule.bundleID)
+        Task { @MainActor in
+            PatchLogService.shared.clear()
+            PatchLogService.shared.isVisible = true
+            PatchLogService.shared.info("=== PATCH PROCESS STARTED ===")
+            PatchLogService.shared.info("Bundle: \(rule.bundleID)")
+            PatchLogService.shared.info("Rule: \(rule.relativePath)")
+            PatchLogService.shared.info("Action: \(isOn ? "ENABLE" : "DISABLE")")
+        }
+
+        do {
+            try withResolvedContainers(bundleIDs: [rule.bundleID]) { roots in
+                guard let root = roots[rule.bundleID] else {
+                    Task { @MainActor in
+                        PatchLogService.shared.error("Container not found for \(rule.bundleID)")
+                    }
+                    throw PatchPackageError.targetAppUnavailable(rule.bundleID)
+                }
+
+                Task { @MainActor in
+                    PatchLogService.shared.success("Container resolved: \(root.path)")
+                }
+
+                try PatchTransaction.setRuleState(isOn, rule: rule, containerRoot: root)
             }
-            try PatchTransaction.setRuleState(isOn, rule: rule, containerRoot: root)
+
+            Task { @MainActor in
+                PatchLogService.shared.success("=== PATCH \(isOn ? "ENABLED" : "DISABLED") SUCCESS ===")
+            }
+        } catch {
+            Task { @MainActor in
+                PatchLogService.shared.error("PATCH FAILED: \(error.localizedDescription)")
+            }
+            throw error
         }
     }
 
@@ -67,15 +95,46 @@ enum DevicePatchService {
         defer { handles.forEach(bad_query_release) }
 
         for bundleID in bundleIDs {
-            guard let path = ContainerStore.resolveAppContainerPath(bundleID: bundleID),
-                  ContainerStore.isApplicationContainerPath(path) else {
+            Task { @MainActor in
+                PatchLogService.shared.info("Resolving container: \(bundleID)")
+            }
+
+            guard let path = ContainerStore.resolveAppContainerPath(bundleID: bundleID) else {
+                Task { @MainActor in
+                    PatchLogService.shared.error("MCMActivateContainerPath failed for \(bundleID)")
+                }
                 throw PatchPackageError.targetAppUnavailable(bundleID)
             }
+
+            Task { @MainActor in
+                PatchLogService.shared.debug("Path resolved: \(path)")
+            }
+
+            guard ContainerStore.isApplicationContainerPath(path) else {
+                Task { @MainActor in
+                    PatchLogService.shared.error("Path validation failed: not an application container")
+                }
+                throw PatchPackageError.targetAppUnavailable(bundleID)
+            }
+
+            Task { @MainActor in
+                PatchLogService.shared.info("Acquiring traversal grant...")
+            }
+
             let handle = ContainerStore.grantContainerAccess(path)
-            guard handle >= 0 else {
-                log("patch: traversal grant failed for \(bundleID), result=\(handle)")
+            if handle < 0 {
+                Task { @MainActor in
+                    PatchLogService.shared.error("bad_query() FAILED, handle=\(handle)")
+                    PatchLogService.shared.error("This usually means the kernel exploit didn't run successfully!")
+                    PatchLogService.shared.info("Try running the exploit first from the Dashboard")
+                }
                 throw PatchPackageError.targetAppUnavailable(bundleID)
             }
+
+            Task { @MainActor in
+                PatchLogService.shared.success("Traversal grant acquired, handle=\(handle)")
+            }
+
             handles.append(handle)
             roots[bundleID] = PatchPathValidator.canonicalFileURL(URL(fileURLWithPath: path, isDirectory: true))
         }

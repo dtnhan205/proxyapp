@@ -60,16 +60,20 @@ enum ContainerStore {
 
     static func resolveAppContainerPath(bundleID: String) -> String? {
         guard (try? PatchPathValidator.canonicalBundleIdentifier(bundleID)) == bundleID else {
+            log("patch: bundle ID validation failed for \(bundleID)")
             return nil
         }
         var lookupError: NSString?
-        guard let path = MCMActivateContainerPath(2, bundleID, false, &lookupError),
-              isApplicationContainerPath(path) else {
-            let detail = lookupError.map(String.init) ?? "unavailable"
-            log("patch: MHA-C2 could not resolve \(bundleID), detail=\(detail)")
+        guard let path = MCMActivateContainerPath(2, bundleID, false, &lookupError) else {
+            let detail = lookupError.map(String.init) ?? "no path returned"
+            log("patch: MHA-C2 FAILED for \(bundleID), error=\(detail)")
             return nil
         }
-        log("patch: MHA-C2 resolved \(bundleID)")
+        guard isApplicationContainerPath(path) else {
+            log("patch: MHA-C2 path is not application container: \(path)")
+            return nil
+        }
+        log("patch: MHA-C2 SUCCESS \(bundleID) -> \(path)")
         return path
     }
 
