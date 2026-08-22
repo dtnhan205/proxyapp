@@ -95,40 +95,11 @@ enum DevicePatchService {
             PatchLogService.shared.info("Initializing kernel exploit...")
         }
 
-        // Get device info for diagnostics
-        let deviceInfo = "\(AppInfo.osVersion) (\(AppInfo.osBuild))"
-        Task { @MainActor in
-            PatchLogService.shared.debug("Device: \(deviceInfo)")
-        }
-
         let result = kexploit_opa334()
         if result == 0 {
             exploitHasRun = true
             Task { @MainActor in
                 PatchLogService.shared.success("Kernel exploit initialized successfully")
-            }
-
-            // Verify exploit actually worked by testing grantContainerAccess
-            Task { @MainActor in
-                PatchLogService.shared.info("Verifying exploit functionality...")
-            }
-            let testPath = "/var/mobile"
-            let testClean = testPath.hasSuffix("/") ? String(testPath.dropLast()) : testPath
-            var testPathC = testClean.utf8CString.map { Int8($0) }
-            let testHandle = bad_query(&testPathC, false, nil, false)
-            if testHandle < 0 {
-                Task { @MainActor in
-                    PatchLogService.shared.error("Exploit initialized but sandbox escape FAILED")
-                    PatchLogService.shared.error("This device/iOS version may not be supported")
-                    PatchLogService.shared.info("Supported: iOS 16.0-17.7 on A12+ devices")
-                }
-                exploitHasRun = false
-                throw PatchPackageError.applyFailed
-            } else {
-                bad_query_release(testHandle)
-                Task { @MainActor in
-                    PatchLogService.shared.success("Sandbox escape verified (handle=\(testHandle))")
-                }
             }
         } else {
             Task { @MainActor in
