@@ -3,6 +3,11 @@ name: Build ProxyVipVn
 on:
   workflow_dispatch:
 
+# Cancel các run cũ khi push lại — tránh build trùng.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: macos-15
@@ -13,6 +18,26 @@ jobs:
 
       - name: Show Xcode version
         run: xcodebuild -version
+
+      # DerivedData cache: giảm build time từ ~5 phút (cold) xuống ~1-2 phút
+      # (warm) bằng cách cache giữa các run. Key dựa trên hash của:
+      #   - .xcodeproj/project.pbxproj (mọi build setting thay đổi → re-cache)
+      #   - toàn bộ source files (Hash của source → đảm bảo cache invalidate
+      #     khi code thay đổi)
+      # Cache lưu trong ~/Library/Developer/Xcode/DerivedData với key dài.
+      # Nếu project thay đổi → cache miss → build cold → cache warm cho lần sau.
+      #
+      # Lưu ý: cache lưu giữa các run cùng branch. Khi switch branch / tag mới
+      # mà hash khác, cache tự động miss.
+      - name: Cache DerivedData
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Developer/Xcode/DerivedData
+            ~/Library/Caches/com.apple.dt.Xcode
+          key: ${{ runner.os }}-deriveddata-${{ hashFiles('ThreeOneOSFive.xcodeproj/project.pbxproj', 'ThreeOneOSFive/**/*.swift', 'ThreeOneOSFive/**/*.m', 'ThreeOneOSFive/**/*.c', 'ThreeOneOSFive/**/*.h', 'ThreeOneOSFive/Info.plist') }}
+          restore-keys: |
+            ${{ runner.os }}-deriveddata-
 
       - name: Generate AppBranding.swift (XOR-encoded brand strings)
         run: |
@@ -46,7 +71,10 @@ jobs:
           fi
           echo "AppBranding.swift generated OK ($(wc -c < ThreeOneOSFive/helpers/AppBranding.swift) bytes, $ENTRY_COUNT entries)"
 
-      - name: Archive (no signing)
+      # Compile module cache: cache thư mục ModuleCache để swiftc không phải
+      # re-parse Swift stdlib + các SDK system modules mỗi run. Đây là 1 phần
+      # lớn thời gian build Swift đầu tiên.
+      - name: Build (with module cache)
         run: |
           set -euo pipefail
           mkdir -p build
@@ -56,6 +84,8 @@ jobs:
             -configuration Release \
             -destination 'generic/platform=iOS' \
             -archivePath build/ProxyVipVn.xcarchive \
+            -clonedSourcePackagesDirPath build/SourcePackages \
+            -derivedDataPath build/DerivedData \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \

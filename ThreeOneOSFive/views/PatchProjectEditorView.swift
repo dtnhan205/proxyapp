@@ -95,8 +95,8 @@ struct PatchProjectEditorView: View {
             }
             .navigationTitle(language.text(existingProject == nil ? "patch.new" : "patch.edit"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6) as AnyShapeStyle, for: .navigationBar)
-            .toolbarBackgroundCompat(.visible, for: .navigationBar)
+            .toolbarBackground(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(language.text("common.cancel")) { dismiss() }
@@ -263,7 +263,7 @@ struct PatchRuleEditorView: View {
                             }
                         }
                         if !replacementFilename.isEmpty {
-                            LabeledContentCompat(
+                            LabeledContent(
                                 label: { Text(language.text("patch.file_size")) },
                                 value: {
                                     Text(ByteCountFormatter.string(
@@ -311,7 +311,7 @@ struct PatchRuleEditorView: View {
                             }
                         }
                         if let originalData {
-                            LabeledContentCompat(
+                            LabeledContent(
                                 label: { Text(language.text("patch.file_size")) },
                                 value: {
                                     Text(ByteCountFormatter.string(
@@ -343,8 +343,8 @@ struct PatchRuleEditorView: View {
             }
             .navigationTitle(language.text(originalRule == nil ? "patch.add_rule" : "patch.edit_rule"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6) as AnyShapeStyle, for: .navigationBar)
-            .toolbarBackgroundCompat(.visible, for: .navigationBar)
+            .toolbarBackground(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(language.text("common.cancel")) { dismiss() }

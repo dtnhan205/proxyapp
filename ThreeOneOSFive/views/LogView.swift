@@ -78,8 +78,8 @@ struct LogView: View {
             }
             .navigationTitle(language.text("logs.title"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6) as AnyShapeStyle, for: .navigationBar)
-            .toolbarBackgroundCompat(.visible, for: .navigationBar)
+            .toolbarBackground(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button(language.text("logs.clear"), role: .destructive) { appLog.entries.removeAll() }
@@ -88,7 +88,7 @@ struct LogView: View {
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(language.text("common.done")) { dismiss() }
-                        .fontWeightCompat(.semibold)
+                        .fontWeight(.semibold)
                         .foregroundStyle(AppTheme.neonCyan)
                 }
             }

@@ -95,7 +95,7 @@ struct LicenseGateView: View {
 
             Text("KEY AUTH")
                 .font(.system(size: 22, weight: .heavy, design: .rounded))
-                .trackingCompat(4)
+                .tracking(4)
                 .foregroundColor(Color(red: 0.0, green: 0.94, blue: 1.0))
                 .shadow(color: Color(red: 0.0, green: 0.94, blue: 1.0).opacity(0.55), radius: 10)
 
@@ -110,14 +110,14 @@ struct LicenseGateView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("LICENSE.KEY")
                 .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                .trackingCompat(2)
+                .tracking(2)
                 .foregroundColor(Color(white: 0.55))
 
             TextField("NHAP-XXXX-XXXX-XXXX-XXXX", text: $keyInput)
                 .textInputAutocapitalization(.characters)
                 .autocorrectionDisabled(true)
                 .font(.system(size: 16, weight: .medium, design: .monospaced))
-                .trackingCompat(1.5)
+                .tracking(1.5)
                 .foregroundColor(.white)
                 .padding(.vertical, 14)
                 .padding(.horizontal, 14)
@@ -166,7 +166,7 @@ struct LicenseGateView: View {
                 }
                 Text(isBusy ? "ĐANG XÁC THỰC…" : "⚡ KÍCH HOẠT")
                     .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .trackingCompat(2)
+                    .tracking(2)
             }
             .foregroundColor(.white)
             .frame(maxWidth: .infinity)

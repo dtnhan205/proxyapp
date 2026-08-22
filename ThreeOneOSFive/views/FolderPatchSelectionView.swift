@@ -45,8 +45,8 @@ struct FolderPatchSelectionView: View {
             }
             .navigationTitle(language.text("patch.select_files"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6) as AnyShapeStyle, for: .navigationBar)
-            .toolbarBackgroundCompat(.visible, for: .navigationBar)
+            .toolbarBackground(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(language.text("common.cancel")) { dismiss() }

@@ -64,8 +64,8 @@ struct PatchProjectsView: View {
                 .accessibilityLabel(language.text("patch.add"))
             }
         }
-        .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6) as AnyShapeStyle, for: .navigationBar)
-        .toolbarBackgroundCompat(.visible, for: .navigationBar)
+        .toolbarBackground(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .sheet(isPresented: $showImporter) {
             FileDocumentPicker(
                 allowedContentTypes: PatchPackagePickerPolicy.allowedContentTypes,
@@ -120,11 +120,11 @@ struct PatchProjectsView: View {
                     .font(.subheadline.weight(.heavy))
                     .foregroundStyle(.primary)
                     .textCase(.uppercase)
-                    .trackingCompat(0.6)
+                    .tracking(0.6)
                 Spacer()
                 Text("\(store.items.count)")
                     .font(.caption2.weight(.bold))
-                    .trackingCompat(1.2)
+                    .tracking(1.2)
                     .foregroundStyle(AppTheme.neonCyan)
                     .padding(.horizontal, 9)
                     .padding(.vertical, 4)
@@ -376,8 +376,8 @@ struct PatchProjectDetailView: View {
         .navigationTitle(item?.project?.name ?? language.text("patch.title"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(content: toolbarItems)
-        .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6) as AnyShapeStyle, for: .navigationBar)
-        .toolbarBackgroundCompat(.visible, for: .navigationBar)
+        .toolbarBackground(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .task { await loadInitialStates() }
         .sheet(isPresented: $showEditor) {
             if let item, let project = item.project {

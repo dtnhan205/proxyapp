@@ -62,8 +62,8 @@ struct AppDataBrowserView: View {
                     .accessibilityLabel(language.text("browser.retry"))
                 }
             }
-            .toolbarBackgroundCompat(AppTheme.techBackgroundTop.opacity(0.6) as AnyShapeStyle, for: .navigationBar)
-            .toolbarBackgroundCompat(.visible, for: .navigationBar)
+            .toolbarBackground(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .onAppear {
                 if !hasLoaded {
                     hasLoaded = true
