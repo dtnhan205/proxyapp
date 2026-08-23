@@ -6,25 +6,37 @@ struct PatchRule: Codable, Identifiable, Hashable {
     var relativePath: String
     var replacementFilename: String
     var replacementData: Data
+    /// The pristine file this rule can restore, bundled alongside the replacement so a
+    /// toggle can flip between the two without depending on an on-device backup. Optional
+    /// for backward compatibility: packages created before this field existed decode with
+    /// `nil` here, and simply can't be toggled off (only the whole-project apply/restore
+    /// flow works for them).
+    var originalData: Data?
 
     init(
         id: UUID = UUID(),
         bundleID: String,
         relativePath: String,
         replacementFilename: String,
-        replacementData: Data
+        replacementData: Data,
+        originalData: Data? = nil
     ) {
         self.id = id
         self.bundleID = bundleID
         self.relativePath = relativePath
         self.replacementFilename = replacementFilename
         self.replacementData = replacementData
+        self.originalData = originalData
     }
 
     /// A zero-byte file is a valid replacement; the filename records that the
     /// user explicitly supplied a payload for this path-only draft rule.
     var hasReplacement: Bool {
         !replacementFilename.isEmpty
+    }
+
+    var canToggle: Bool {
+        originalData != nil
     }
 }
 
