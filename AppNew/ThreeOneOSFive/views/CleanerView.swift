@@ -75,6 +75,7 @@ struct CleanerView: View {
                     .listStyle(.insetGrouped)
                     .scrollContentBackground(.hidden)
             }
+            .appBackground()
             .navigationTitle(language.text("cleaner.title"))
             .navigationBarTitleDisplayMode(.inline)
             .scrollDismissesKeyboard(.interactively)
@@ -86,7 +87,6 @@ struct CleanerView: View {
                 reload()
             }
         }
-        .appBackground()
     }
 
     @ViewBuilder

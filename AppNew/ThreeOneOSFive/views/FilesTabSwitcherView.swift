@@ -36,6 +36,7 @@ struct FilesTabSwitcherView: View {
             }
             .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
+            .appBackground()
             .navigationTitle(language.text("browser.tabs"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -70,7 +71,6 @@ struct FilesTabSwitcherView: View {
                 Text(language.text("browser.tab_name_message"))
             }
         }
-        .appBackground()
     }
 
     private func tabRow(_ tab: FilesTabState) -> some View {

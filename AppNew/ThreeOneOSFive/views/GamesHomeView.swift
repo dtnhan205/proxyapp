@@ -24,6 +24,8 @@ struct GamesHomeView: View {
 
                 emptyStatePlaceholder
             }
+            .frame(maxWidth: .infinity)
+            .appBackground()
             .navigationTitle(AppBranding.string("tabHome", locale: language.rawValue))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { homeToolbar }
@@ -42,7 +44,8 @@ struct GamesHomeView: View {
                 }
             }
         }
-        .appBackground()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipped()
         .tint(AppTheme.neonCyan)
         .preferredColorScheme(.dark)
     }

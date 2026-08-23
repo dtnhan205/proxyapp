@@ -36,6 +36,7 @@ struct WallpaperLabView: View {
             }
             .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
+            .appBackground()
             .navigationTitle(language.text("wallpaper.title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { toolbarContent }
@@ -63,7 +64,6 @@ struct WallpaperLabView: View {
                 checkAccess()
             }
         }
-        .appBackground()
     }
 
     private var accessSection: some View {

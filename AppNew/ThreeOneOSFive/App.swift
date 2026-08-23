@@ -30,32 +30,35 @@ struct ThreeOneOSFiveApp: App {
                 // `.frame(... infinity)` đảm bảo ảnh LUÔN được cung cấp kích
                 // thước màn hình (không dựa vào intrinsic content size) — fix
                 // trường hợp ảnh quá nhỏ so với màn hình iPad lớn.
-                Image("Background")
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                //
+                // ⚠️ `.ignoresSafeArea()` áp dụng NGOÀI `.frame(...)` để:
+                //   1. Background ignore safe area → fill full screen pixel
+                //   2. KHÔNG lan truyền ignore-safe-area lên RootView (giữ
+                //      foreground trong safe area, không gây tràn layout).
+                Color.clear
                     .ignoresSafeArea()
-                    .clipped()
+                    .overlay {
+                        ZStack(alignment: .topLeading) {
+                            Image("Background")
+                                .resizable()
+                                .scaledToFill()
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .clipped()
 
-                // Lớp phủ mờ để chữ trên ảnh nền luôn đọc được.
-                // `.ultraThinMaterial` của SwiftUI blur ảnh nhẹ + darken
-                // → text/icon cyan/magenta vẫn pop trên nền ảnh.
-                Rectangle()
-                    .fill(.ultraThinMaterial)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .ignoresSafeArea()
-                    .opacity(0.55)
+                            Rectangle()
+                                .fill(.ultraThinMaterial)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .opacity(0.55)
 
-                // Fallback tối nếu asset "Background" không load được
-                // (ví dụ Xcode cache cũ) — gradient nền đảm bảo màn không bị
-                // nền trắng chói.
-                Color.black
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .ignoresSafeArea()
-                    .opacity(0.18)
+                            Color.black
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .opacity(0.18)
+                        }
+                    }
 
                 RootView()
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .environmentObject(appState)
             .environmentObject(patchDraftCoordinator)
             .environmentObject(supportToastModel)

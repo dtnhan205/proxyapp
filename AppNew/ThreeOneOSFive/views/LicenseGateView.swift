@@ -20,6 +20,8 @@ struct LicenseGateView: View {
 
     var body: some View {
         content
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .clipped()
             .preferredColorScheme(.dark)
             .onAppear(perform: handleAppear)
             .onDisappear(perform: handleDisappear)

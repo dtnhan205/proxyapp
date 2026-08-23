@@ -47,6 +47,7 @@ struct GamePatchesView: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 24)
             }
+            .appBackground()
             .refreshable {
                 await sync()
                 await loadProjectStates()
@@ -57,7 +58,8 @@ struct GamePatchesView: View {
                 patchLogOverlay
             }
         }
-        .appBackground()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipped()
         .navigationTitle(game.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

@@ -32,6 +32,7 @@ struct SettingsView: View {
                 }
                 .scrollContentBackgroundCompat()
                 .scrollDismissesKeyboardCompat()
+                .appBackground()
                 .navigationTitle(language.text("settings.title"))
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbarBackground(AppTheme.techBackgroundTop.opacity(0.85), for: .navigationBar)
@@ -46,7 +47,8 @@ struct SettingsView: View {
                 }
             }
         }
-        .appBackground()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipped()
         .preferredColorScheme(.dark)
     }
 

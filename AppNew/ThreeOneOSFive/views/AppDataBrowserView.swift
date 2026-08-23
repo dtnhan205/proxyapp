@@ -88,7 +88,6 @@ struct AppDataBrowserView: View {
                 }
             }
         }
-        .appBackground()
     }
 
     private var activeNavigationPath: Binding<[FileBrowserDestination]> {
@@ -177,6 +176,7 @@ struct AppDataBrowserView: View {
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
+        .appBackground()
         .environment(\.defaultMinListRowHeight, 48)
         .scrollDismissesKeyboard(.interactively)
         .overlay {

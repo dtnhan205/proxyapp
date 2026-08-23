@@ -57,8 +57,8 @@ struct LogView: View {
                                 }
                             }
                             .padding(AppTheme.pageInset)
-                            .background(AppTheme.consoleBackground)
                         }
+                        .appBackground()
                         .onChange(of: appLog.entries.count) { count in
                             guard count > 0 else { return }
                             if reduceMotion {
@@ -101,6 +101,5 @@ struct LogView: View {
                 }
             }
         }
-        .appBackground()
     }
 }
