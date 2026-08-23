@@ -112,7 +112,12 @@
 "patch.menu_title" = "PROXYVIPVN V2";
 "patch.menu_auto_badge" = "VIP VN";
 "patch.game_entry_notice_title" = "Before entering the game";
-"patch.game_entry_notice_message" = "Turn on Location first, then enter the game. For Aim, stand in the game lobby before turning it on.";
+"patch.game_entry_notice_subtitle" = "Follow these 2 steps to avoid issues";
+"patch.game_entry_notice_step1_label" = "Step 1 — Location";
+"patch.game_entry_notice_step1_desc" = "Turn on Location first, then launch the game.";
+"patch.game_entry_notice_step2_label" = "Step 2 — Aim";
+"patch.game_entry_notice_step2_desc" = "Stand still in the game lobby before turning on Aim.";
+"patch.game_entry_notice_confirm" = "Got it";
 "patch.game_entry_notice_dismiss" = "Don't show again";
 "patch.add" = "Add patch project";
 "patch.new" = "New Patch";

@@ -111,8 +111,13 @@
 "patch.title" = "Patch";
 "patch.menu_title" = "PROXY PATCH";
 "patch.menu_auto_badge" = "VIP VN";
-"patch.game_entry_notice_title" = "Lưu ý khi vào game";
-"patch.game_entry_notice_message" = "Định vị anh em bật rồi mới vào game, Aim anh em sẽ đứng ở sảnh game rồi bật.";
+"patch.game_entry_notice_title" = "Trước khi vào game";
+"patch.game_entry_notice_subtitle" = "Làm theo 2 bước sau để tránh lỗi";
+"patch.game_entry_notice_step1_label" = "Bước 1 — Định vị";
+"patch.game_entry_notice_step1_desc" = "Bật Định vị xong rồi mới mở game.";
+"patch.game_entry_notice_step2_label" = "Bước 2 — Aim";
+"patch.game_entry_notice_step2_desc" = "Vào sảnh game, đứng yên rồi mới bật Aim.";
+"patch.game_entry_notice_confirm" = "Đã hiểu";
 "patch.game_entry_notice_dismiss" = "Không hiển thị lại";
 "patch.add" = "Thêm dự án patch";
 "patch.new" = "Tạo patch";
