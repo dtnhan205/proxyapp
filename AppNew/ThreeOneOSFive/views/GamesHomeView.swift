@@ -90,7 +90,7 @@ struct GamesHomeView: View {
                     draftCoordinator.clear()
                 }
             }
-        }
+
         .tint(AppTheme.neonCyan)
         .preferredColorScheme(.dark)
     }
