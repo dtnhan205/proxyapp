@@ -1,6 +1,7 @@
 import Foundation
 
 enum ExploitSupportPolicy {
+    static let verifiedIOS16Range = "16.0–16.7.x"
     static let verifiedIOS17Range = "17.0–17.7.x"
     static let verifiedIOS18Range = "18.0–18.7.1"
     static let verifiedIOS26Range = "26.0–26.6.1"
@@ -22,6 +23,14 @@ enum ExploitSupportPolicy {
 
     static func supportsKernelExploit(major: Int, minor: Int, patch: Int) -> Bool {
         guard minor >= 0, patch >= 0 else { return false }
+
+        if major == 16 {
+            // UI hỗ trợ iOS 16.0–16.7.x (theo yêu cầu). Offset kexploit vẫn giữ
+            // nguyên (xem `kexploit/offsets.m`) — chỉ TEXT/UI/policy ở đây.
+            // Thiết bị iOS 16 sẽ được mark "supported" nhưng kernel exploit
+            // thực tế sẽ fail ở runtime cho tới khi bổ sung offset.
+            return minor <= 7
+        }
 
         if major == 17 {
             return minor <= 7

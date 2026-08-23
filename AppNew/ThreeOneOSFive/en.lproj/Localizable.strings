@@ -41,7 +41,7 @@
 "onboarding.install_message" = "3105 requires a supported signing method to access device features.";
 "onboarding.install_ok" = "Works with enterprise certificates, including eSign and similar enterprise installs.";
 "onboarding.install_bad" = "Does not work with SideStore, AltStore, 3uTools or LiveContainer.";
-"onboarding.install_jailbreak" = "On iOS 17 through iOS 18.7.1, 3105 will not work if the device is jailbroken.";
+"onboarding.install_jailbreak" = "On iOS 16 through iOS 18.7.1, 3105 will not work if the device is jailbroken.";
 "onboarding.install_footer" = "Use a supported certificate on a non-jailbroken device before continuing.";
 
 "dashboard.exploit_access" = "Exploit access";
@@ -57,14 +57,14 @@
 "dashboard.device_name" = "Device name";
 "dashboard.hardware_model" = "Hardware model";
 "dashboard.access_footer" = "Access is reported as successful only after the system file opens for reading and writing.";
-"dashboard.unsupported_footer" = "iOS %@ (%@) is outside the verified range. Supported: iOS 17.0–17.7.x, iOS 18.0–18.7.1, iOS 26.0–26.6.1, iOS 27.0 Developer Beta 1–4 and Public Beta 1–2.";
+"dashboard.unsupported_footer" = "iOS %@ (%@) is outside the verified range. Supported: iOS 16.0–16.7.x, iOS 17.0–17.7.x, iOS 18.0–18.7.1, iOS 26.0–26.6.1, iOS 27.0 Developer Beta 1–4 and Public Beta 1–2.";
 "dashboard.app_browser" = "App Data Browser";
 "dashboard.browser" = "File Browser";
 "dashboard.open_browser" = "Open File Browser";
 "dashboard.browser_footer" = "Browse and read data from every app and system container on this device.";
 "dashboard.device_actions_warning" = "Save pending changes before restarting the device.";
 "dashboard.unsupported_device" = "Unsupported Device";
-"dashboard.unsupported_message" = "iOS %@ is not yet supported.\n\nCurrently supported:\n• iOS 17.0–17.7.x\n• iOS 18.0–18.7.1\n• iOS 26.0–26.6.1\n• iOS 27.0 Developer Beta 1–4\n• iOS 27.0 Public Beta 1–2";
+"dashboard.unsupported_message" = "iOS %@ is not yet supported.\n\nCurrently supported:\n• iOS 16.0–16.7.x\n• iOS 17.0–17.7.x\n• iOS 18.0–18.7.1\n• iOS 26.0–26.6.1\n• iOS 27.0 Developer Beta 1–4\n• iOS 27.0 Public Beta 1–2";
 "dashboard.installation" = "Installation";
 "dashboard.kernel_status" = "Kernel status";
 "dashboard.kernel_running" = "Activating…";
@@ -111,11 +111,11 @@
 "patch.title" = "Patches";
 "patch.menu_title" = "PROXYVIPVN V2";
 "patch.menu_auto_badge" = "VIP VN";
-"patch.game_entry_notice_title" = "Before entering the game";
-"patch.game_entry_notice_subtitle" = "Follow these 2 steps to avoid issues";
-"patch.game_entry_notice_step1_label" = "Step 1 — Location";
+"patch.game_entry_notice_title" = "HOW TO USE";
+"patch.game_entry_notice_subtitle" = "Follow these steps to avoid encountering issues.";
+"patch.game_entry_notice_step1_label" = "Location";
 "patch.game_entry_notice_step1_desc" = "Turn on Location first, then launch the game.";
-"patch.game_entry_notice_step2_label" = "Step 2 — Aim";
+"patch.game_entry_notice_step2_label" = "Aim";
 "patch.game_entry_notice_step2_desc" = "Stand still in the game lobby before turning on Aim.";
 "patch.game_entry_notice_confirm" = "Got it";
 "patch.game_entry_notice_dismiss" = "Don't show again";
@@ -250,7 +250,7 @@
 "settings.beta_build" = "Beta %lld · %@";
 "settings.developer_beta_build" = "Developer Beta %lld · %@";
 "settings.developer_public_beta_build" = "Developer Beta %lld / Public Beta %lld · %@";
-"settings.supported_range_summary" = "Verified: iOS 17.0–17.7.x, iOS 18.0–18.7.1, iOS 26.0–26.6.1, iOS 27.0 Developer Beta 1–4 and Public Beta 1–2.";
+"settings.supported_range_summary" = "Verified: iOS 16.0–16.7.x, iOS 17.0–17.7.x, iOS 18.0–18.7.1, iOS 26.0–26.6.1, iOS 27.0 Developer Beta 1–4 and Public Beta 1–2.";
 
 "kernel.section_title" = "Kernel Exploit";
 "kernel.run_exploit" = "Run Kernel Exploit";

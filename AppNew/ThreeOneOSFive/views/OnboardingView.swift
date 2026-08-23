@@ -197,6 +197,7 @@ struct OnboardingView: View {
                     .padding(.horizontal, 22)
             }
             VStack(alignment: .leading, spacing: 10) {
+                versionRow(icon: "checkmark.circle.fill", title: "iOS 16", value: ExploitSupportPolicy.verifiedIOS16Range, color: .green)
                 versionRow(icon: "checkmark.circle.fill", title: "iOS 17", value: ExploitSupportPolicy.verifiedIOS17Range, color: .green)
                 versionRow(icon: "checkmark.circle.fill", title: "iOS 18", value: ExploitSupportPolicy.verifiedIOS18Range, color: .green)
                 versionRow(icon: "checkmark.circle.fill", title: "iOS 26", value: ExploitSupportPolicy.verifiedIOS26Range, color: .green)

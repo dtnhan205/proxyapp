@@ -187,6 +187,7 @@ struct SettingsView: View {
             }
 
             VStack(alignment: .leading, spacing: 10) {
+                compatibilityRow(label: "iOS 16", value: ExploitSupportPolicy.verifiedIOS16Range)
                 compatibilityRow(label: "iOS 17", value: ExploitSupportPolicy.verifiedIOS17Range)
                 compatibilityRow(label: "iOS 18", value: ExploitSupportPolicy.verifiedIOS18Range)
                 compatibilityRow(label: "iOS 26", value: ExploitSupportPolicy.verifiedIOS26Range)
