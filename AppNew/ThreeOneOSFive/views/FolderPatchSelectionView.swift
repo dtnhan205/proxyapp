@@ -58,6 +58,7 @@ struct FolderPatchSelectionView: View {
             }
             .task { loadCandidates() }
         }
+        .appBackground()
     }
 
     private var fileList: some View {
@@ -120,6 +121,7 @@ struct FolderPatchSelectionView: View {
             }
         }
         .listStyle(.plain)
+        .scrollContentBackground(.hidden)
     }
 
     private var selectionActionTitle: String {

@@ -73,6 +73,7 @@ struct CleanerView: View {
                 Divider()
                 cleanerList
                     .listStyle(.insetGrouped)
+                    .scrollContentBackground(.hidden)
             }
             .navigationTitle(language.text("cleaner.title"))
             .navigationBarTitleDisplayMode(.inline)
@@ -85,6 +86,7 @@ struct CleanerView: View {
                 reload()
             }
         }
+        .appBackground()
     }
 
     @ViewBuilder

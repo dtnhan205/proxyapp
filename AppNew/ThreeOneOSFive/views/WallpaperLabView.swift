@@ -35,6 +35,7 @@ struct WallpaperLabView: View {
                 if !activeReceipts.isEmpty { resetSection }
             }
             .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
             .navigationTitle(language.text("wallpaper.title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { toolbarContent }
@@ -62,6 +63,7 @@ struct WallpaperLabView: View {
                 checkAccess()
             }
         }
+        .appBackground()
     }
 
     private var accessSection: some View {

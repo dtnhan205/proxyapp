@@ -57,6 +57,7 @@ struct GamePatchesView: View {
                 patchLogOverlay
             }
         }
+        .appBackground()
         .navigationTitle(game.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

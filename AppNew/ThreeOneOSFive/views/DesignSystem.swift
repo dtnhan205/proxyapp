@@ -573,3 +573,46 @@ struct AppLogo: View {
 // MARK: - Color hex helper
 // `Color(hex:)` đã được khai báo ở GamesHomeView.swift (line 290), không để tránh
 // "invalid redeclaration" error.
+
+// MARK: - AppBackground helper
+//
+// SwiftUI mặc định cho NavigationStack và List một opaque system background
+// che hết parent ZStack. Để ảnh nền `Background.imageset/background.png`
+// hiện được trên MỌI màn hình (Home, Settings, Game Detail, Cleaner, Files,
+// Onboarding, …), apply modifier `.appBackground()` ở root view của từng
+// trang — nó sẽ vẽ ảnh nền + lớp overlay đọc-chữ được (giống App.swift).
+//
+// Modifier này:
+//   • Không gọi `ignoresSafeArea()` ở đây vì caller có thể đặt trong
+//     NavigationStack/List mà parent đã xử lý safe area. Caller dùng thêm
+//     `.ignoresSafeArea()` nếu muốn ảnh phủ kín cả status bar / tab bar.
+//   • Dùng `.scaledToFill() + .clipped()` để ảnh LUÔN fill và KHÔNG tràn
+//     ra ngoài frame (fix bug "ảnh nền tràn sang 2 bên").
+//   • Overlay `.ultraThinMaterial` 55% + Color.black 18% để text cyan/magenta
+//     vẫn pop trên nền ảnh (giống App.swift root ZStack).
+extension View {
+    /// Ảnh nền phủ kín view hiện tại. Dùng cho các màn đặt trong
+    /// NavigationStack/List mà system background mặc định che mất ảnh nền
+    /// global trong App.swift.
+    func appBackground() -> some View {
+        self.background {
+            ZStack {
+                Image("Background")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
+
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .opacity(0.55)
+
+                Color.black
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .opacity(0.18)
+            }
+            .ignoresSafeArea()
+        }
+    }
+}

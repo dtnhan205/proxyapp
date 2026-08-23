@@ -72,6 +72,7 @@ struct PatchProjectsView: View {
                     }
                 }
                 .listStyle(.insetGrouped)
+                .scrollContentBackground(.hidden)
             }
             .navigationTitle(language.text("patch.title"))
             .navigationBarTitleDisplayMode(.inline)
@@ -149,6 +150,7 @@ struct PatchProjectsView: View {
                 consumeExternalImport()
             }
         }
+        .appBackground()
     }
 
     private func consumeExternalImport() {

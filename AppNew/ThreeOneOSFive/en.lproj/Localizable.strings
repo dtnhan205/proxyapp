@@ -163,6 +163,8 @@
 "patch.folder_selection_footer" = "Select the target paths you need. You will choose each replacement file in the patch editor.";
 "patch.select_all" = "Select All";
 "patch.deselect_all" = "Deselect All";
+"patch.toggle_on_success" = "Enabled %@";
+"patch.toggle_off_success" = "Disabled %@";
 "patch.preparing_from_browser" = "Preparing patch paths…";
 "patch.create_from_browser_failed" = "Couldn't Create Patch";
 "patch.password" = "Password";

@@ -153,7 +153,9 @@ struct PatchProjectEditorView: View {
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
         }
+        .appBackground()
     }
 
     private func ruleRow(_ rule: PatchRule) -> some View {
@@ -357,7 +359,9 @@ struct PatchRuleEditorView: View {
                 )
                 .ignoresSafeArea()
             }
+            .scrollContentBackground(.hidden)
         }
+        .appBackground()
     }
 
     private func importFile(_ result: Result<[URL], Error>) {

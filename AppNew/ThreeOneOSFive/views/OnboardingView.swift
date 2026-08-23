@@ -26,6 +26,7 @@ struct OnboardingView: View {
                 controls
             }
         }
+        .appBackground()
         .tint(AppTheme.accent)
         .animation(.spring(response: 0.38, dampingFraction: 0.84), value: step)
         .animation(.spring(response: 0.38, dampingFraction: 0.84), value: languageCode)

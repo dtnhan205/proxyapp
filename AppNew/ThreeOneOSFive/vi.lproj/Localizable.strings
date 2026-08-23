@@ -163,6 +163,8 @@
 "patch.folder_selection_footer" = "Chọn các đường dẫn đích bạn cần. Bạn sẽ chọn riêng tệp thay thế trong trình sửa patch.";
 "patch.select_all" = "Chọn tất cả";
 "patch.deselect_all" = "Bỏ chọn tất cả";
+"patch.toggle_on_success" = "Đã bật %@";
+"patch.toggle_off_success" = "Đã tắt %@";
 "patch.preparing_from_browser" = "Đang chuẩn bị đường dẫn patch…";
 "patch.create_from_browser_failed" = "Không thể tạo patch";
 "patch.password" = "Mật khẩu";

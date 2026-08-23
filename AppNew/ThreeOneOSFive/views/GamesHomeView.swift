@@ -42,6 +42,7 @@ struct GamesHomeView: View {
                 }
             }
         }
+        .appBackground()
         .tint(AppTheme.neonCyan)
         .preferredColorScheme(.dark)
     }
@@ -54,6 +55,7 @@ struct GamesHomeView: View {
                 gameCardButton(for: game, at: index)
             }
         }
+        .frame(maxWidth: .infinity)
         .padding(16)
         .animation(.easeOut(duration: 0.3), value: games)
         .navigationDestinationCompat(isPresented: $showingGamePatches) {
@@ -129,6 +131,7 @@ struct GamesHomeView: View {
             deviceInfoRow(icon: "apple.logo", iconColor: AppTheme.neonMagenta, label: "iOS", value: shortOSVersion)
             deviceInfoRow(icon: "iphone", iconColor: AppTheme.neonCyan, label: language.text("common.device"), value: AppInfo.hardwareDisplayName)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
         .techCard(glow: AppTheme.neonCyan, opacity: 0.15)

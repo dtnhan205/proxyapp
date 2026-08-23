@@ -72,7 +72,6 @@ struct LogView: View {
                     }
                 }
             }
-            .background(AppTheme.consoleBackground.ignoresSafeArea())
             .navigationTitle(language.text("logs.title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -102,5 +101,6 @@ struct LogView: View {
                 }
             }
         }
+        .appBackground()
     }
 }

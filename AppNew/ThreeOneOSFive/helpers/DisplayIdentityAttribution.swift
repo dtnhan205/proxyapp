@@ -155,7 +155,6 @@ struct DisplayAttributionSheet: View {
             .formStyle(.grouped)
             .tint(AppTheme.accent)
             .scrollContentBackground(.hidden)
-            .background(AppTheme.pageBackground)
             .navigationTitle(language.text("attribution.title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -164,6 +163,7 @@ struct DisplayAttributionSheet: View {
                 }
             }
         }
+        .appBackground()
         .presentationDetents([.medium])
     }
 }

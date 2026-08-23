@@ -92,6 +92,7 @@ struct FileBrowserView: View {
                 }
             }
             .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
             .environment(\.defaultMinListRowHeight, AppTheme.fileRowHeight)
             .scrollDismissesKeyboard(.interactively)
             .overlay {
@@ -351,6 +352,7 @@ struct FileBrowserView: View {
                 dismissButton: .default(Text(language.text("common.done")))
             )
         }
+        .appBackground()
     }
 
     @ViewBuilder

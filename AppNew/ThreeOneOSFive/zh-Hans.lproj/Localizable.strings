@@ -163,6 +163,8 @@
 "patch.folder_selection_footer" = "选择所需的目标路径。请在补丁编辑器中分别选择替换文件。";
 "patch.select_all" = "全选";
 "patch.deselect_all" = "取消全选";
+"patch.toggle_on_success" = "已开启 %@";
+"patch.toggle_off_success" = "已关闭 %@";
 "patch.preparing_from_browser" = "正在准备补丁路径…";
 "patch.create_from_browser_failed" = "无法创建补丁";
 "patch.password" = "密码";

@@ -46,6 +46,7 @@ struct SettingsView: View {
                 }
             }
         }
+        .appBackground()
         .preferredColorScheme(.dark)
     }
 
@@ -58,7 +59,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     PulsingDot(color: AppTheme.neonCyan, size: 6)
-                    NeonReadout(text: "PROFILE", tint: AppTheme.neonCyan)
+                    NeonReadout(text: "TheNhanCheat", tint: AppTheme.neonCyan)
                 }
                 Text(bundleDisplayName)
                     .font(.title3.weight(.bold))
