@@ -91,6 +91,7 @@ struct GamesHomeView: View {
                 }
             }
 
+        }
         .tint(AppTheme.neonCyan)
         .preferredColorScheme(.dark)
     }

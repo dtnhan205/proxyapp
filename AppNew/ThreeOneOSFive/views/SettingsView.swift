@@ -7,36 +7,41 @@ struct SettingsView: View {
     @AppStorage(AppLanguage.storageKey) private var languageCode = AppLanguage.english.rawValue
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 16) {
-                    profileCard
-                    languageCard
-                    deviceCard
-                    compatibilityCard
+        ZStack {
+            TechBackground()
+                .accessibilityHidden(true)
 
-                    Text(language.text("settings.supported_versions_footer"))
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 8)
-                        .padding(.top, 4)
+            NavigationStack {
+                ScrollView {
+                    VStack(spacing: 16) {
+                        profileCard
+                        languageCard
+                        deviceCard
+                        compatibilityCard
+
+                        Text(language.text("settings.supported_versions_footer"))
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 8)
+                            .padding(.top, 4)
+                    }
+                    .padding(.horizontal, AppTheme.pageInset)
+                    .padding(.vertical, 16)
                 }
-                .padding(.horizontal, AppTheme.pageInset)
-                .padding(.vertical, 16)
-            }
-            .scrollContentBackgroundCompat()
-            .scrollDismissesKeyboardCompat()
-            .navigationTitle(language.text("settings.title"))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(AppTheme.techBackgroundTop.opacity(0.85), for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(language.text("common.done")) { dismiss() }
-                        .fontWeight(.semibold)
-                        .foregroundStyle(AppTheme.neonCyan)
-                        .shadow(color: AppTheme.neonCyan.opacity(0.55), radius: 6)
+                .scrollContentBackgroundCompat()
+                .scrollDismissesKeyboardCompat()
+                .navigationTitle(language.text("settings.title"))
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbarBackground(AppTheme.techBackgroundTop.opacity(0.85), for: .navigationBar)
+                .toolbarBackground(.visible, for: .navigationBar)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button(language.text("common.done")) { dismiss() }
+                            .fontWeight(.semibold)
+                            .foregroundStyle(AppTheme.neonCyan)
+                            .shadow(color: AppTheme.neonCyan.opacity(0.55), radius: 6)
+                    }
                 }
             }
         }
