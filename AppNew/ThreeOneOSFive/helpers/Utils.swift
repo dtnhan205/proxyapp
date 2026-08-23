@@ -440,8 +440,8 @@ private func prettifyIdentifier(_ raw: String) -> String {
     guard !trimmed.isEmpty else { return "Unknown device" }
     // Tách prefix + số đầu + số sau dấu phẩy.
     if let commaIdx = trimmed.firstIndex(of: ",") {
-        let prefix = trimmed[..<commaIdx]
-        let suffix = trimmed[trimmed.index(after: commaIdx)...]
+        let prefix = String(trimmed[..<commaIdx])
+        let suffix = String(trimmed[trimmed.index(after: commaIdx)...])
         return "\(prefix) \(prefixNumber(prefix)) · \(suffix)"
     }
     return trimmed
