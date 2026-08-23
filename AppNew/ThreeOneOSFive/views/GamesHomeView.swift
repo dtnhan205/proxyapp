@@ -1,4 +1,4 @@
-import SwiftUI
+﻿import SwiftUI
 import UIKit
 
 struct GamesHomeView: View {
@@ -55,7 +55,6 @@ struct GamesHomeView: View {
                             .padding(.top, 8)
                     }
                 }
-            }
             .navigationTitle(AppBranding.string("tabHome", locale: language.rawValue))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
