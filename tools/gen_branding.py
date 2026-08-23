@@ -5,11 +5,13 @@ Mỗi string được XOR với key ngẫu nhiên rồi encode thành hex byte a
 App chỉ chứa hex byte + key trong binary — `strings` không tìm ra tên brand.
 
 Usage:
-  python3 tools/gen_branding.py           # generate Swift file
-  python3 tools/gen_branding.py --print   # print Swift to stdout
+  python3 tools/gen_branding.py                  # generate ThreeOneOSFive/helpers/AppBranding.swift
+  python3 tools/gen_branding.py --print          # print Swift to stdout
+  python3 tools/gen_branding.py --out-dir PATH  # write AppBranding.swift vào PATH
 
 Build integration:
   Wire this script vào GitHub Actions workflow TRƯỚC khi xcodebuild.
+  Dùng --out-dir để trỏ vào project con (vd AppNew/ThreeOneOSFive/helpers).
 """
 import os
 import sys
@@ -188,7 +190,15 @@ enum AppBranding {{
 
 
 def main():
-    out_dir = Path(__file__).resolve().parent.parent / "ThreeOneOSFive" / "helpers"
+    # Mặc định vẫn ghi vào ThreeOneOSFive/helpers/AppBranding.swift ở root
+    # (backwards-compat). Có thể override bằng --out-dir để build các project
+    # con khác (vd AppNew/ThreeOneOSFive/helpers/AppBranding.swift).
+    default_out = Path(__file__).resolve().parent.parent / "ThreeOneOSFive" / "helpers"
+    out_dir = default_out
+    for i, arg in enumerate(sys.argv):
+        if arg == "--out-dir" and i + 1 < len(sys.argv):
+            out_dir = Path(sys.argv[i + 1])
+            break
     out_path = out_dir / "AppBranding.swift"
 
     content = generate_swift()

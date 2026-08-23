@@ -2,7 +2,6 @@ import Foundation
 
 enum DevicePatchService {
     private static var exploitHasRun = false
-    private static var kernelRwValid = false
 
     static func apply(project: PatchProject) throws -> PatchTransactionReceipt {
         let bundleIDs = orderedBundleIdentifiers(in: project)
@@ -90,74 +89,25 @@ enum DevicePatchService {
     }
 
     private static func ensureExploitReady() throws {
-        if exploitHasRun && kernelRwValid { return }
+        if exploitHasRun { return }
 
         Task { @MainActor in
-            PatchLogService.shared.info("=== STAGE 1/2: kernel r/w ===")
             PatchLogService.shared.info("Initializing kernel exploit...")
         }
 
-        let kret = kexploit_opa334()
-        if kret != 0 {
+        let result = kexploit_opa334()
+        if result == 0 {
+            exploitHasRun = true
             Task { @MainActor in
-                PatchLogService.shared.error("Kernel exploit FAILED with code: \(kret)")
+                PatchLogService.shared.success("Kernel exploit initialized successfully")
+            }
+        } else {
+            Task { @MainActor in
+                PatchLogService.shared.error("Kernel exploit FAILED with code: \(result)")
                 PatchLogService.shared.error("This device may not be supported by the exploit")
             }
             throw PatchPackageError.applyFailed
         }
-        Task { @MainActor in
-            PatchLogService.shared.success("Kernel exploit OK - kernel r/w established")
-        }
-
-        // Validate kernel r/w by reading our own proc struct
-        let selfProc = proc_self()
-        if selfProc == 0 {
-            Task { @MainActor in
-                PatchLogService.shared.error("Kernel r/w validation FAILED - proc_self() returned 0")
-            }
-            throw PatchPackageError.applyFailed
-        }
-        kernelRwValid = true
-        Task { @MainActor in
-            PatchLogService.shared.info("Kernel r/w validated - proc_self=0x\(String(selfProc, radix: 16))")
-        }
-
-        // iOS < 26: kernel r/w alone is sufficient
-        let v = ProcessInfo.processInfo.operatingSystemVersion
-        if v.majorVersion < 26 {
-            Task { @MainActor in
-                PatchLogService.shared.info("iOS \(v.majorVersion) detected - kernel r/w sufficient (no sandbox escape needed)")
-                PatchLogService.shared.success("=== EXPLOIT COMPLETE ===")
-            }
-            exploitHasRun = true
-            return
-        }
-
-        // iOS 26+: need sandbox escape for file access
-        Task { @MainActor in
-            PatchLogService.shared.info("=== STAGE 2/2: sandbox escape (iOS \(v.majorVersion)) ===")
-        }
-
-        let sbxRet = sandbox_escape(selfProc)
-        
-        if sbxRet == 0 && hasSandboxAccess() {
-            Task { @MainActor in
-                PatchLogService.shared.success("Sandbox escape OK - full R+W filesystem")
-                PatchLogService.shared.success("=== EXPLOIT COMPLETE ===")
-            }
-            exploitHasRun = true
-            return
-        }
-
-        Task { @MainActor in
-            PatchLogService.shared.error("Sandbox escape FAILED code=\(sbxRet)")
-            PatchLogService.shared.error("iOS \(v.majorVersion) requires sandbox escape but exploit failed")
-        }
-        throw PatchPackageError.applyFailed
-    }
-    
-    private static func hasSandboxAccess() -> Bool {
-        sandbox_access_is_active() == 1
     }
 
     private static func withResolvedContainers<T>(

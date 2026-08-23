@@ -2,85 +2,102 @@ name: Build ProxyVipVn
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main, master]
+    paths:
+      - 'AppNew/ThreeOneOSFive/**'
+      - 'AppNew/ThreeOneOSFive.xcodeproj/**'
+      - 'tools/**'
+      - '.github/workflows/build-proxyvipvn.yml'
 
-# Cancel các run cũ khi push lại — tránh build trùng.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   build:
+    name: Build IPA
     runs-on: macos-15
     timeout-minutes: 60
 
     steps:
+      - name: Show runner info
+        run: |
+          sw_vers
+          xcodebuild -version
+          xcrun --sdk iphonesimulator --show-sdk-version
+          xcrun --sdk iphoneos --show-sdk-version
+
       - uses: actions/checkout@v4
 
-      - name: Show Xcode version
-        run: xcodebuild -version
-
-      # DerivedData cache: giảm build time từ ~5 phút (cold) xuống ~1-2 phút
-      # (warm) bằng cách cache giữa các run. Key dựa trên hash của:
-      #   - .xcodeproj/project.pbxproj (mọi build setting thay đổi → re-cache)
-      #   - toàn bộ source files (Hash của source → đảm bảo cache invalidate
-      #     khi code thay đổi)
-      # Cache lưu trong ~/Library/Developer/Xcode/DerivedData với key dài.
-      # Nếu project thay đổi → cache miss → build cold → cache warm cho lần sau.
-      #
-      # Lưu ý: cache lưu giữa các run cùng branch. Khi switch branch / tag mới
-      # mà hash khác, cache tự động miss.
+      # Cache DerivedData của Xcode để giảm thời gian build từ ~5 phút
+      # (cold) xuống ~1-2 phút (warm). Key dựa trên hash của:
+      #   - .xcodeproj/project.pbxproj (build settings thay đổi → re-cache)
+      #   - toàn bộ source files (Swift/ObjC/C/Headers/Info.plist)
+      # Cache lưu trong ~/Library/Developer/Xcode/DerivedData.
       - name: Cache DerivedData
         uses: actions/cache@v4
         with:
           path: |
             ~/Library/Developer/Xcode/DerivedData
             ~/Library/Caches/com.apple.dt.Xcode
-          key: ${{ runner.os }}-deriveddata-${{ hashFiles('ThreeOneOSFive.xcodeproj/project.pbxproj', 'ThreeOneOSFive/**/*.swift', 'ThreeOneOSFive/**/*.m', 'ThreeOneOSFive/**/*.c', 'ThreeOneOSFive/**/*.h', 'ThreeOneOSFive/Info.plist') }}
+          key: ${{ runner.os }}-deriveddata-${{ hashFiles('AppNew/ThreeOneOSFive.xcodeproj/project.pbxproj', 'AppNew/ThreeOneOSFive/**/*.swift', 'AppNew/ThreeOneOSFive/**/*.m', 'AppNew/ThreeOneOSFive/**/*.c', 'AppNew/ThreeOneOSFive/**/*.h', 'AppNew/ThreeOneOSFive/Info.plist') }}
           restore-keys: |
             ${{ runner.os }}-deriveddata-
 
-      - name: Generate AppBranding.swift (XOR-encoded brand strings)
+      # Gen branding trước khi build: file này được tạo động từ gen_branding.py
+      # (giải mã XOR-encoded brand strings) để tránh hard-code plaintext trong
+      # repo. Dùng --out-dir để trỏ vào AppNew (project con).
+      # Nếu script fail hoặc generate ra file rỗng → fail build ngay.
+      - name: Generate AppBranding.swift
         run: |
           set -euo pipefail
-          python3 tools/gen_branding.py
-          # Sanity-check: file phải tồn tại và có chứa hex byte (không rỗng).
-          if [ ! -s ThreeOneOSFive/helpers/AppBranding.swift ]; then
-            echo "AppBranding.swift was not generated or is empty"; exit 1
+          python3 tools/gen_branding.py --out-dir AppNew/ThreeOneOSFive/helpers
+          BRAND_FILE="AppNew/ThreeOneOSFive/helpers/AppBranding.swift"
+
+          # File phải tồn tại và không rỗng.
+          if [ ! -s "$BRAND_FILE" ]; then
+            echo "::error::AppBranding.swift was not generated or is empty"
+            exit 1
           fi
-          # Plaintext "ProxyVipVn" không được tồn tại trong file generated.
+
+          # Plaintext brand không được xuất hiện trong file generated.
           # Nếu script sinh nhầm plaintext thì fail build ngay.
-          if grep -q "ProxyVipVn V2" ThreeOneOSFive/helpers/AppBranding.swift; then
-            echo "Plaintext brand leaked into AppBranding.swift — check gen_branding.py"; exit 1
+          if grep -q "ProxyVipVn V2" "$BRAND_FILE"; then
+            echo "::error::Plaintext brand leaked into AppBranding.swift"
+            exit 1
           fi
+
           # Đếm tuple entries: phải khớp với số brand strings × số locales (5 × 3 = 15).
-          # Mỗi entry phải kết thúc bằng `,` nếu không phải entry cuối của locale block.
-          ENTRY_COUNT=$(grep -cE '^\s*\("[a-zA-Z]+",' ThreeOneOSFive/helpers/AppBranding.swift || true)
+          ENTRY_COUNT=$(grep -cE '^\s*\("[a-zA-Z]+",' "$BRAND_FILE" || true)
           if [ "$ENTRY_COUNT" != "15" ]; then
-            echo "Expected 15 entries (5 strings × 3 locales), found $ENTRY_COUNT"; exit 1
+            echo "::error::Expected 15 entries (5 strings × 3 locales), found $ENTRY_COUNT"
+            exit 1
           fi
-          # Mỗi tuple trong array literal PHẢI kết thúc bằng dấu phẩy, nếu không
-          # Swift compiler báo "expected ',' separator" (đã từng xảy ra khi gen
-          # quên trailing comma). Tìm các dòng chứa tuple literal hex-array
-          # (bắt đầu bằng `("` và có `[0x` ở giữa) kết thúc bằng `])` — đây là
-          # entry THIẾU trailing comma. Bỏ qua dòng typealias `(String, [UInt8], [UInt8])`.
-          BAD_TUPLES=$(grep -E '^\s*\("[a-zA-Z]+",.*\]\)$' ThreeOneOSFive/helpers/AppBranding.swift || true)
+
+          # Mỗi tuple literal phải kết thúc bằng dấu phẩy — nếu không Swift
+          # compiler báo "expected ',' separator".
+          BAD_TUPLES=$(grep -E '^\s*\("[a-zA-Z]+",.*\]\)$' "$BRAND_FILE" || true)
           if [ -n "$BAD_TUPLES" ]; then
-            echo "Found tuple without trailing comma — Swift will fail to compile:"
+            echo "::error::Found tuple without trailing comma — Swift will fail to compile:"
             echo "$BAD_TUPLES"
             exit 1
           fi
-          echo "AppBranding.swift generated OK ($(wc -c < ThreeOneOSFive/helpers/AppBranding.swift) bytes, $ENTRY_COUNT entries)"
 
-      # Compile module cache: cache thư mục ModuleCache để swiftc không phải
-      # re-parse Swift stdlib + các SDK system modules mỗi run. Đây là 1 phần
-      # lớn thời gian build Swift đầu tiên.
-      - name: Build (with module cache)
+          echo "AppBranding.swift generated OK ($(wc -c < "$BRAND_FILE") bytes, $ENTRY_COUNT entries)"
+
+      # Build archive (universal iOS, không sign — sẽ sign ở bước sau nếu cần).
+      # Scheme shared nằm trong AppNew/ThreeOneOSFive.xcodeproj/xcshareddata/xcschemes/.
+      # PRODUCT_NAME = "ProxyVipVn" trong pbxproj → .app bundle ra tên ProxyVipVn.app
+      # (đã khớp với CFBundleDisplayName trong Info.plist).
+      # CODE_SIGNING_ALLOWED=NO → build unsigned, dùng cho test/preview.
+      - name: Build archive
         run: |
           set -euo pipefail
           mkdir -p build
           xcodebuild \
-            -project ThreeOneOSFive.xcodeproj \
-            -scheme ProxyVipVn \
+            -project AppNew/ThreeOneOSFive.xcodeproj \
+            -scheme 3105 \
             -configuration Release \
             -destination 'generic/platform=iOS' \
             -archivePath build/ProxyVipVn.xcarchive \
@@ -91,27 +108,57 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             archive
 
-      - name: Package IPA (Payload/ProxyVipVn.app structure)
+      # Đóng gói IPA từ .app trong archive. Cấu trúc IPA chuẩn:
+      #   Payload/ProxyVipVn.app
+      #   Payload/ProxyVipVn.app/Info.plist
+      #   ...
+      - name: Package IPA
+        id: package
         run: |
           set -euo pipefail
           APP_DIR="build/ProxyVipVn.xcarchive/Products/Applications/ProxyVipVn.app"
           if [ ! -d "$APP_DIR" ]; then
-            echo "App bundle not found. Listing available apps:"
-            ls build/ProxyVipVn.xcarchive/Products/Applications/
+            echo "::error::App bundle not found. Available apps:"
+            ls -la build/ProxyVipVn.xcarchive/Products/Applications/
             exit 1
           fi
+
           rm -rf build/ipa
           mkdir -p build/ipa/Payload
           cp -r "$APP_DIR" build/ipa/Payload/
-          cd build/ipa
-          zip -r ProxyVipVn.ipa Payload
-          ls -la
-          echo "---"
-          unzip -l ProxyVipVn.ipa | head -20
 
-      - name: Upload artifact
+          cd build/ipa
+          zip -qr ProxyVipVn.ipa Payload
+          cd "$GITHUB_WORKSPACE"
+
+          # Verify IPA hợp lệ: phải có Payload/ProxyVipVn.app/Info.plist
+          unzip -l build/ipa/ProxyVipVn.ipa | head -30
+          unzip -l build/ipa/ProxyVipVn.ipa | grep -q "Payload/ProxyVipVn.app/Info.plist" \
+            || { echo "::error::Invalid IPA structure"; exit 1; }
+
+          IPA_SIZE=$(stat -f%z build/ipa/ProxyVipVn.ipa)
+          echo "IPA size: $IPA_SIZE bytes"
+          echo "ipa_path=build/ipa/ProxyVipVn.ipa" >> "$GITHUB_OUTPUT"
+
+      - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
           name: ProxyVipVn-ipa
           path: build/ipa/ProxyVipVn.ipa
           if-no-files-found: error
+          retention-days: 14
+
+      # Log size của .app + danh sách binary architectures để debug nhanh
+      # nếu IPA fail trên thiết bị thật (vd. "requires arm64, found x86_64").
+      - name: Inspect binary
+        if: always()
+        run: |
+          APP_DIR="build/ProxyVipVn.xcarchive/Products/Applications/ProxyVipVn.app"
+          if [ -d "$APP_DIR" ]; then
+            echo "=== App bundle size ==="
+            du -sh "$APP_DIR"
+            echo "=== Mach-O architectures ==="
+            lipo -info "$APP_DIR/ProxyVipVn" || true
+            echo "=== Linked frameworks ==="
+            otool -L "$APP_DIR/ProxyVipVn" | head -20
+          fi
