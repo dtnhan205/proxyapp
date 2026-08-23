@@ -111,6 +111,9 @@
 "patch.title" = "Patch";
 "patch.menu_title" = "PROXY PATCH";
 "patch.menu_auto_badge" = "VIP VN";
+"patch.game_entry_notice_title" = "Lưu ý khi vào game";
+"patch.game_entry_notice_message" = "Định vị anh em bật rồi mới vào game, Aim anh em sẽ đứng ở sảnh game rồi bật.";
+"patch.game_entry_notice_dismiss" = "Không hiển thị lại";
 "patch.add" = "Thêm dự án patch";
 "patch.new" = "Tạo patch";
 "patch.import" = "Nhập .3105";

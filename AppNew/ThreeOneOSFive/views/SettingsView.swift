@@ -100,7 +100,7 @@ struct SettingsView: View {
             }
 
             HStack(spacing: 8) {
-                ForEach(AppLanguage.allCases) { option in
+                ForEach(AppLanguage.selectableCases) { option in
                     let isActive = option.rawValue == languageCode
                     Button {
                         languageCode = option.rawValue

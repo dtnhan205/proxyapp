@@ -111,6 +111,9 @@
 "patch.title" = "Patches";
 "patch.menu_title" = "PROXYVIPVN V2";
 "patch.menu_auto_badge" = "VIP VN";
+"patch.game_entry_notice_title" = "Before entering the game";
+"patch.game_entry_notice_message" = "Turn on Location first, then enter the game. For Aim, stand in the game lobby before turning it on.";
+"patch.game_entry_notice_dismiss" = "Don't show again";
 "patch.add" = "Add patch project";
 "patch.new" = "New Patch";
 "patch.import" = "Import .3105";

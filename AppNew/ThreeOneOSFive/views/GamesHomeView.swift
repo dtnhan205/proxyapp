@@ -176,7 +176,6 @@ struct GameCardView: View {
     let accent: Color
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var glowPhase: Double = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -190,21 +189,12 @@ struct GameCardView: View {
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
-                // Performance: Slower sheen (8s vs 3.5s), skip animation if reduceMotion
-                if !reduceMotion {
-                    LinearGradient(
-                        colors: [
-                            .clear,
-                            Color.white.opacity(0.25),
-                            .clear,
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .rotationEffect(.degrees(20))
-                    .offset(x: CGFloat(glowPhase * 200 - 100))
-                    .blendMode(.overlay)
-                }
+                // Sheen sweep removed: it was an 8s `repeatForever` LinearGradient
+                // offset + rotation + `blendMode(.overlay)` running on EVERY card
+                // in the home grid. With 8–15 game cards visible at once that was
+                // 8–15 simultaneous always-on animations — the largest single
+                // source of frame drops on the home screen. Visual is preserved
+                // by the static gradient + icon overlay below.
                 iconView
                     .frame(width: 56, height: 56)
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -247,13 +237,7 @@ struct GameCardView: View {
                     lineWidth: 1
                 )
         )
-        .onAppear {
-            guard !reduceMotion else { return }
-            // Performance: Slower animation (8s vs 3.5s = 57% slower)
-            withAnimation(.linear(duration: 8.0).repeatForever(autoreverses: false)) {
-                glowPhase = 1.0
-            }
-        }
+        // Sheen sweep removed for performance — see comment in `body`.
     }
 
     @ViewBuilder

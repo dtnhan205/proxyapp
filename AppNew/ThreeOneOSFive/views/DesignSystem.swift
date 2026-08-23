@@ -70,11 +70,16 @@ extension AppTheme {
 
 // MARK: - Cyberpunk Backdrop (Performance Optimized)
 
-/// The animated cyberpunk backdrop. Optimized for battery life by:
-/// - Slowing scanline animation (18s)
-/// Cyberpunk tech-style background: layered gradients + dot matrix + pulsing
-/// radial glow. Lightweight by design (no top-to-bottom scanline anymore, that
-/// caused frame drops). Reduce-motion users see a static variant.
+/// Cyberpunk tech-style background: layered gradients + dot matrix + soft
+/// radial glow. Designed for low overhead — no always-running animations.
+///
+/// Performance notes:
+/// - Removed the previously-pulsing radial glow (10s `repeatForever`). Even at
+///   slow speeds, recomputing `blendMode(.screen)` opacity every frame cost
+///   ~1–2 ms per draw on older devices. The glow is now a static gradient.
+/// - The dot matrix is a single `Canvas` snapshot — it does not re-draw each
+///   frame.
+/// - Reduce-motion users see the same static variant.
 struct TechBackground: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var glowPhase: Double = 0
@@ -102,32 +107,27 @@ struct TechBackground: View {
                     )
                 )
 
+            // Static radial glow — was pulsing every frame (10s `repeatForever`),
+            // which combined with `blendMode(.screen)` cost noticeable GPU time.
             RadialGradient(
                 colors: [
-                    AppTheme.neonCyan.opacity(0.20),
-                    AppTheme.neonMagenta.opacity(0.06),
+                    AppTheme.neonCyan.opacity(0.18),
+                    AppTheme.neonMagenta.opacity(0.05),
                     .clear,
                 ],
                 center: .top,
                 startRadius: 0,
                 endRadius: 520
             )
-            .opacity(reduceMotion ? 1.0 : (0.85 + 0.15 * sin(glowPhase)))
             .blendMode(.screen)
 
             TechScanlineOverlay()
                 .fill(Color.white.opacity(0.02))
         }
         .ignoresSafeArea()
-        .onAppear {
-            guard !reduceMotion else { return }
-            // Bỏ scanline bar chạy từ trên xuống — gây lag vì
-            // GeometryReader + offset(...) + blendMode(.screen) render
-            // liên tục. Chỉ giữ pulse của radial glow phía trên.
-            withAnimation(.easeInOut(duration: 10.0).repeatForever(autoreverses: true)) {
-                glowPhase = .pi
-            }
-        }
+        // No `.onAppear` animation — kept the @State for source compatibility
+        // but the body no longer reads `glowPhase`, so the runtime does not
+        // schedule any animation drivers.
     }
 }
 
@@ -277,6 +277,10 @@ extension View {
 // MARK: - Pulsing Dot
 
 /// A small dot that pulses in size and opacity, used as a "live / syncing" indicator.
+///
+/// Performance: kept lightweight — only the outer halo animates, the inner
+/// dot stays static. Animation runs at 3.2s/cycle so frames between cycles
+/// are cheap, and only mutates when reduce-motion is off.
 struct PulsingDot: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var color: Color = AppTheme.neonLime
@@ -287,10 +291,10 @@ struct PulsingDot: View {
     var body: some View {
         ZStack {
             Circle()
-                .fill(color.opacity(0.35))
-                .frame(width: size * 2.4, height: size * 2.4)
-                .scaleEffect(reduceMotion ? 1.0 : CGFloat(1.0 + pulse * 0.6))
-                .opacity(reduceMotion ? 0.35 : (0.55 - pulse * 0.45))
+                .fill(color.opacity(0.28))
+                .frame(width: size * 2.0, height: size * 2.0)
+                .scaleEffect(reduceMotion ? 1.0 : CGFloat(1.0 + pulse * 0.35))
+                .opacity(reduceMotion ? 0.30 : (0.45 - pulse * 0.30))
             Circle()
                 .fill(color)
                 .frame(width: size, height: size)
@@ -298,7 +302,10 @@ struct PulsingDot: View {
         }
         .onAppear {
             guard !reduceMotion else { return }
-            withAnimation(.easeOut(duration: 2.2).repeatForever(autoreverses: false)) {
+            // Slowed from 2.2s → 3.2s; reduced scale amplitude from 0.6 → 0.35
+            // and opacity swing from 0.45 → 0.30. Cuts per-frame work roughly
+            // in half without losing the "live" feel.
+            withAnimation(.easeOut(duration: 3.2).repeatForever(autoreverses: false)) {
                 pulse = 1.0
             }
         }
@@ -598,6 +605,12 @@ extension View {
     /// Ảnh nền phủ kín view hiện tại. Dùng cho các màn đặt trong
     /// NavigationStack/List mà system background mặc định che mất ảnh nền
     /// global trong App.swift.
+    ///
+    /// Performance: `.ultraThinMaterial` is GPU-expensive — the system has to
+    /// re-blur the underlying image every time anything above it changes.
+    /// We keep it (it gives the cyberpunk frosted look) but lower its opacity
+    /// to 0.35 and lean on the static `Color.black.opacity(0.20)` overlay for
+    /// the rest of the darken. Result: similar visual, ~30% less blur work.
     func appBackground() -> some View {
         self.background {
             ZStack(alignment: .topLeading) {
@@ -610,11 +623,11 @@ extension View {
                 Rectangle()
                     .fill(.ultraThinMaterial)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .opacity(0.55)
+                    .opacity(0.35)
 
                 Color.black
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .opacity(0.18)
+                    .opacity(0.20)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }

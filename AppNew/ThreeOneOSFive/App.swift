@@ -48,11 +48,11 @@ struct ThreeOneOSFiveApp: App {
                             Rectangle()
                                 .fill(.ultraThinMaterial)
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                .opacity(0.55)
+                                .opacity(0.35)
 
                             Color.black
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                .opacity(0.18)
+                                .opacity(0.20)
                         }
                     }
 

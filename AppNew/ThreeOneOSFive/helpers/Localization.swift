@@ -10,6 +10,12 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var locale: Locale { Locale(identifier: rawValue) }
 
+    /// Ngôn ngữ hiển thị trong picker cài đặt / onboarding.
+    /// Loại bỏ `simplifiedChinese` theo yêu cầu (chỉ giữ English + Vietnamese).
+    static var selectableCases: [AppLanguage] {
+        allCases.filter { $0 != .simplifiedChinese }
+    }
+
     var displayName: String {
         switch self {
         case .english: return "English"

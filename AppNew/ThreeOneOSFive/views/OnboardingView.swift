@@ -91,7 +91,7 @@ struct OnboardingView: View {
                     .padding(.horizontal, 24)
             }
             VStack(spacing: 10) {
-                ForEach(AppLanguage.allCases) { option in
+                ForEach(AppLanguage.selectableCases) { option in
                     Button {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.82)) {
                             languageCode = option.rawValue
@@ -102,7 +102,7 @@ struct OnboardingView: View {
                                 Text(option.displayName)
                                     .font(.body.weight(.semibold))
                                     .foregroundStyle(.primary)
-                                Text(option.rawValue == "en" ? "English" : option.rawValue == "vi" ? "Tiếng Việt" : "简体中文")
+                                Text(option.rawValue == "en" ? "English" : "Tiếng Việt")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }

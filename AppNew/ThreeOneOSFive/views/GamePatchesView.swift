@@ -12,6 +12,8 @@ struct GamePatchesView: View {
     @State private var showKeySheet = false
     @State private var keyBannerVisible = true
     @State private var showPatchLog = false
+    @State private var showEntryNotice: Bool = false
+    @AppStorage("patch.gameEntryNoticeDismissed") private var entryNoticeDismissed: Bool = false
     @AppStorage("patch.importedOnlineIDs") private var importedOnlineIDsRaw = ""
     @AppStorage("patch.gameAssignments") private var gameAssignmentsRaw = "{}"
     @AppStorage("patch.remoteToLocalMap") private var remoteToLocalMapRaw = "{}"
@@ -93,6 +95,25 @@ struct GamePatchesView: View {
             if !hasValidKey {
                 showKeySheet = true
             }
+            // Lần đầu vào game (chưa từng bấm "Không hiển thị lại") → show lưu ý
+            // về Định vị + Aim. Dùng Task ngắn để alert có thời gian mount.
+            if !entryNoticeDismissed {
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 250_000_000)
+                    showEntryNotice = true
+                }
+            }
+        }
+        .alert(
+            language.text("patch.game_entry_notice_title"),
+            isPresented: $showEntryNotice
+        ) {
+            Button(language.text("common.ok")) {}
+            Button(language.text("patch.game_entry_notice_dismiss"), role: .cancel) {
+                entryNoticeDismissed = true
+            }
+        } message: {
+            Text(language.text("patch.game_entry_notice_message"))
         }
         .alert(item: $store.alert) { alert in
             Alert(
