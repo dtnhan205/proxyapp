@@ -443,6 +443,74 @@ enum PatchIconCatalog {
     }
 }
 
+// MARK: - Neon Toggle
+
+/// A bespoke neon toggle styled for the cyberpunk theme. The track is a translucent neon capsule
+/// that fills with a cyan→magenta gradient when on, and a dim grey when off. The knob is a small
+/// glowing disc.
+struct NeonToggleStyle: ToggleStyle {
+    var onColor: Color = AppTheme.neonCyan
+    var offColor: Color = Color.white.opacity(0.18)
+
+    func makeBody(configuration: Configuration) -> some View {
+        let isOn = configuration.isOn
+        Button {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                configuration.isOn.toggle()
+            }
+        } label: {
+            ZStack(alignment: isOn ? .trailing : .leading) {
+                Capsule()
+                    .fill(
+                        isOn
+                            ? LinearGradient(
+                                colors: [onColor.opacity(0.85), AppTheme.neonMagenta.opacity(0.55)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                            : LinearGradient(
+                                colors: [offColor, offColor.opacity(0.5)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                    )
+                    .frame(width: 48, height: 28)
+                    .overlay(
+                        Capsule()
+                            .strokeBorder(
+                                (isOn ? onColor : Color.white.opacity(0.25)).opacity(0.7),
+                                lineWidth: 1
+                            )
+                    )
+                    .shadow(
+                        color: isOn ? onColor.opacity(0.65) : .clear,
+                        radius: isOn ? 8 : 0
+                    )
+
+                Circle()
+                    .fill(Color.white)
+                    .frame(width: 22, height: 22)
+                    .shadow(
+                        color: isOn ? onColor.opacity(0.8) : .clear,
+                        radius: isOn ? 6 : 0
+                    )
+                    .padding(3)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(configuration.isOn ? "On" : "Off")
+    }
+}
+
+extension View {
+    /// Convenience to apply the cyberpunk neon style with a chosen accent color on a Toggle.
+    /// Placed on `View` rather than `Toggle` because `.labelsHidden()` returns `some View`,
+    /// so the call site no longer has a concrete `Toggle` to dispatch to.
+    func neonToggleTint(_ color: Color = AppTheme.neonCyan) -> some View {
+        self.toggleStyle(NeonToggleStyle(onColor: color))
+    }
+}
+
 // MARK: - AppNew minimal UI primitives (kept from original AppNew DesignSystem)
 
 struct AppRowIcon: View {
@@ -532,17 +600,5 @@ struct AppLogo: View {
 }
 
 // MARK: - Color hex helper
-// Used by GamesHomeView + GamePatchesView để parse bannerColor hex string từ server
-// thành SwiftUI Color (vd "1A2B3C" → Color(red: 0.10, green: 0.17, blue: 0.24)).
-extension Color {
-    init?(hex: String) {
-        var value = hex.trimmingCharacters(in: .whitespacesAndNewlines)
-        if value.hasPrefix("#") { value.removeFirst() }
-        guard value.count == 6, let rgb = UInt32(value, radix: 16) else { return nil }
-        self.init(
-            red: Double((rgb >> 16) & 0xFF) / 255,
-            green: Double((rgb >> 8) & 0xFF) / 255,
-            blue: Double(rgb & 0xFF) / 255
-        )
-    }
-}
+// `Color(hex:)` đã được khai báo ở GamesHomeView.swift (line 290), không để tránh
+// "invalid redeclaration" error.

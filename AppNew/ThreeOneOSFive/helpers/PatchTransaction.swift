@@ -537,6 +537,81 @@ enum PatchTransaction {
         try PropertyListDecoder().decode(Journal.self, from: Data(contentsOf: url))
     }
 
+    /// Instantly writes one rule's bundled replacement or original file to the device —
+    /// no transaction, no backup, since both possible contents are already known and bundled
+    /// in the package. This is what a per-rule toggle switch calls on every flip.
+    static func setRuleState(
+        _ isOn: Bool,
+        rule: PatchRule,
+        containerRoot: URL,
+        fileManager: FileManager = .default
+    ) throws {
+        let data: Data
+        if isOn {
+            data = rule.replacementData
+        } else {
+            guard let originalData = rule.originalData else {
+                throw PatchPackageError.invalidProject
+            }
+            data = originalData
+        }
+        let root = PatchPathValidator.canonicalFileURL(containerRoot)
+        let target = try PatchPathValidator.resolveContainedTargetURL(relativePath: rule.relativePath, containerRoot: root)
+        try validateTarget(target, relativePath: rule.relativePath, containerRoot: root, fileManager: fileManager)
+        try atomicWrite(data, to: target, preservingExistingAttributes: true, fileManager: fileManager)
+    }
+
+    /// Reads back whatever is currently on disk for this rule and reports whether it matches
+    /// the replacement, the original, or neither — used to initialize a toggle's displayed
+    /// state without trusting any locally cached assumption.
+    static func currentRuleState(rule: PatchRule, containerRoot: URL, fileManager: FileManager = .default) -> Bool? {
+        let root = PatchPathValidator.canonicalFileURL(containerRoot)
+        guard let target = try? PatchPathValidator.resolveContainedTargetURL(relativePath: rule.relativePath, containerRoot: root),
+              let current = try? Data(contentsOf: target)
+        else {
+            return nil
+        }
+        let currentDigest = Data(SHA256.hash(data: current))
+        if currentDigest == Data(SHA256.hash(data: rule.replacementData)) {
+            return true
+        }
+        if let originalData = rule.originalData, currentDigest == Data(SHA256.hash(data: originalData)) {
+            return false
+        }
+        return nil
+    }
+
+    /// Đảm bảo đường dẫn target tồn tại, không qua symbolic link, và parent dirs là thư mục thật.
+    /// Tránh attacker lừa ghi file ra ngoài container qua relativePath kiểu "../../etc/passwd".
+    private static func validateTarget(
+        _ target: URL,
+        relativePath: String,
+        containerRoot: URL,
+        fileManager: FileManager
+    ) throws {
+        let components = try PatchPathValidator.canonicalRelativePath(relativePath)
+            .split(separator: "/")
+            .map(String.init)
+        var cursor = PatchPathValidator.canonicalFileURL(containerRoot)
+        for component in components.dropLast() {
+            cursor.appendPathComponent(component, isDirectory: true)
+            guard fileManager.fileExists(atPath: cursor.path) else {
+                throw PatchPackageError.applyFailed
+            }
+            let values = try cursor.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+            guard values.isSymbolicLink != true else {
+                throw PatchPackageError.symbolicLinkUnsupported
+            }
+            guard values.isDirectory == true else {
+                throw PatchPackageError.applyFailed
+            }
+        }
+        let targetValues = try target.resourceValues(forKeys: [.isSymbolicLinkKey])
+        if targetValues.isSymbolicLink == true {
+            throw PatchPackageError.symbolicLinkUnsupported
+        }
+    }
+
     private static func digest(_ data: Data) -> Data {
         Data(SHA256.hash(data: data))
     }

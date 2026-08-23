@@ -37,6 +37,26 @@ enum DevicePatchService {
         return PatchTransaction.latestReceipt(projectID: projectID, backupRoot: backupRoot)
     }
 
+    /// Toggle a single rule on/off instantly — no full project transaction needed
+    /// because both contents (replacement + original) are bundled in the package.
+    static func setRuleState(_ isOn: Bool, rule: PatchRule) throws {
+        try withResolvedContainers(bundleIDs: [rule.bundleID]) { roots in
+            guard let root = roots[rule.bundleID] else {
+                throw PatchPackageError.targetAppUnavailable(rule.bundleID)
+            }
+            try PatchTransaction.setRuleState(isOn, rule: rule, containerRoot: root)
+        }
+    }
+
+    /// Read what's currently on disk for this rule and report whether it matches
+    /// the replacement (`true`), the original (`false`), or neither (`nil`).
+    static func currentRuleState(for rule: PatchRule) -> Bool? {
+        try? withResolvedContainers(bundleIDs: [rule.bundleID]) { roots in
+            guard let root = roots[rule.bundleID] else { return nil }
+            return PatchTransaction.currentRuleState(rule: rule, containerRoot: root)
+        }
+    }
+
     private static func orderedBundleIdentifiers(in project: PatchProject) -> [String] {
         project.allBundleIdentifiers
     }
