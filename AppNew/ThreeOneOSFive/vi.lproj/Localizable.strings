@@ -109,6 +109,8 @@
 "cleaner.select_all_results" = "Chọn tất cả kết quả";
 
 "patch.title" = "Patch";
+"patch.menu_title" = "PROXY PATCH";
+"patch.menu_auto_badge" = "VIP VN";
 "patch.add" = "Thêm dự án patch";
 "patch.new" = "Tạo patch";
 "patch.import" = "Nhập .3105";

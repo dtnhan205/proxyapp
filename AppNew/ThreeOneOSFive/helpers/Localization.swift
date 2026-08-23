@@ -18,6 +18,25 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         }
     }
 
+    /// Quốc kỳ hiển thị cạnh tên ngôn ngữ trong segmented picker (cyberpunk style).
+    var flag: String {
+        switch self {
+        case .english: return "🇺🇸"
+        case .vietnamese: return "🇻🇳"
+        case .simplifiedChinese: return "🇨🇳"
+        }
+    }
+
+    /// Tên ngắn cho chip nhỏ (vd "EN", "VI", "中"). Khi picker đã có flag, dùng
+    /// tên ngắn để tiết kiệm chiều ngang.
+    var shortName: String {
+        switch self {
+        case .english: return "EN"
+        case .vietnamese: return "VI"
+        case .simplifiedChinese: return "中"
+        }
+    }
+
     func text(_ key: String) -> String {
         localizedBundle.localizedString(forKey: key, value: key, table: nil)
     }

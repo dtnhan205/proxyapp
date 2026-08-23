@@ -15,13 +15,10 @@ struct GamesHomeView: View {
 
     var body: some View {
         NavigationStackCompat {
-            ZStack {
-                TechBackground()
-
-                ScrollView {
-                    deviceInfoCard
-                        .padding(.horizontal, 16)
-                        .padding(.top, 12)
+            ScrollView {
+                deviceInfoCard
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
 
                     LazyVGrid(columns: columns, spacing: 14) {
                         ForEach(Array(games.enumerated()), id: \.element.id) { index, game in

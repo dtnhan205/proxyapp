@@ -19,33 +19,17 @@ struct LicenseGateView: View {
     private let totalTimeoutSeconds: Int = 60
 
     var body: some View {
-        ZStack {
-            backgroundLayer
-            content
-        }
-        .preferredColorScheme(.dark)
-        .onAppear(perform: handleAppear)
-        .onDisappear(perform: handleDisappear)
-        .onChange(of: keyInput) { _ in
-            errorMessage = nil
-            isError = false
-        }
+        content
+            .preferredColorScheme(.dark)
+            .onAppear(perform: handleAppear)
+            .onDisappear(perform: handleDisappear)
+            .onChange(of: keyInput) { _ in
+                errorMessage = nil
+                isError = false
+            }
     }
 
     // MARK: - Layout
-
-    private var backgroundLayer: some View {
-        LinearGradient(
-            colors: [
-                Color(red: 0.02, green: 0.03, blue: 0.08),
-                Color(red: 0.04, green: 0.06, blue: 0.16),
-                Color(red: 0.02, green: 0.03, blue: 0.08)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-        .ignoresSafeArea()
-    }
 
     private var content: some View {
         VStack(spacing: 28) {

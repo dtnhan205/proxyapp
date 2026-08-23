@@ -20,15 +20,22 @@ struct ThreeOneOSFiveApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView()
-                .environmentObject(appState)
-                .environmentObject(patchDraftCoordinator)
-                .environmentObject(supportToastModel)
-                .environment(\.appLanguage, language)
-                .environment(\.locale, language.locale)
-                .onAppear {
-                    appState.detectSupport()
-                }
+            ZStack {
+                Image("Background")
+                    .resizable()
+                    .scaledToFill()
+                    .ignoresSafeArea()
+
+                RootView()
+            }
+            .environmentObject(appState)
+            .environmentObject(patchDraftCoordinator)
+            .environmentObject(supportToastModel)
+            .environment(\.appLanguage, language)
+            .environment(\.locale, language.locale)
+            .onAppear {
+                appState.detectSupport()
+            }
         }
     }
 }

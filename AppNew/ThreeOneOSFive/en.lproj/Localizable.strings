@@ -109,6 +109,8 @@
 "cleaner.select_all_results" = "Select All Results";
 
 "patch.title" = "Patches";
+"patch.menu_title" = "PROXYVIPVN V2";
+"patch.menu_auto_badge" = "VIP VN";
 "patch.add" = "Add patch project";
 "patch.new" = "New Patch";
 "patch.import" = "Import .3105";

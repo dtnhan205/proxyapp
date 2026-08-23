@@ -39,8 +39,6 @@ struct GamePatchesView: View {
 
     var body: some View {
         ZStack {
-            TechBackground()
-
             ScrollView {
                 VStack(spacing: 20) {
                     header

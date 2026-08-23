@@ -25,6 +25,15 @@ struct SupportStatusToast: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .allowsHitTesting(model.isVisible)
         .onAppear {
+            // Đảm bảo luôn có auto-dismiss khi view tồn tại trong hierarchy.
+            model.scheduleAutoDismiss(after: autoDismissAfter)
+        }
+        // Bắt buộc thiết lập lại countdown mỗi khi payload thay đổi (present
+        // từ RootView hay announceSupportStatus). `.onAppear` chỉ chạy 1 lần
+        // và `present()` đã `cancel()` task trước đó nên nếu chỉ dựa vào
+        // `.onAppear`, toast sẽ KHÔNG tự ẩn sau khi gọi `present()`.
+        .onChange(of: model.payload) { newPayload in
+            guard newPayload != nil else { return }
             model.scheduleAutoDismiss(after: autoDismissAfter)
         }
     }

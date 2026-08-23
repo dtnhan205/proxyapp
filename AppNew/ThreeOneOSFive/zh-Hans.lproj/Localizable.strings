@@ -109,6 +109,8 @@
 "cleaner.select_all_results" = "选择全部结果";
 
 "patch.title" = "补丁";
+"patch.menu_title" = "补丁菜单";
+"patch.menu_auto_badge" = "AUTO";
 "patch.add" = "添加补丁项目";
 "patch.new" = "新建补丁";
 "patch.import" = "导入 .3105";

@@ -72,12 +72,11 @@ extension AppTheme {
 
 /// The animated cyberpunk backdrop. Optimized for battery life by:
 /// - Slowing scanline animation (18s)
-/// - Reducing glow pulse duration (10s)
-/// - Removing diagonal line animation
-/// - Simplifying dot matrix rendering
+/// Cyberpunk tech-style background: layered gradients + dot matrix + pulsing
+/// radial glow. Lightweight by design (no top-to-bottom scanline anymore, that
+/// caused frame drops). Reduce-motion users see a static variant.
 struct TechBackground: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var scanlineY: CGFloat = -0.25
     @State private var glowPhase: Double = 0
 
     var body: some View {
@@ -116,35 +115,15 @@ struct TechBackground: View {
             .opacity(reduceMotion ? 1.0 : (0.85 + 0.15 * sin(glowPhase)))
             .blendMode(.screen)
 
-            GeometryReader { geo in
-                ScanlineBar()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                .clear,
-                                AppTheme.neonCyan.opacity(0.18),
-                                AppTheme.neonIce.opacity(0.35),
-                                AppTheme.neonCyan.opacity(0.18),
-                                .clear,
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .frame(height: 90)
-                    .offset(y: scanlineY * geo.size.height)
-                    .blendMode(.screen)
-            }
-
             TechScanlineOverlay()
                 .fill(Color.white.opacity(0.02))
         }
         .ignoresSafeArea()
         .onAppear {
             guard !reduceMotion else { return }
-            withAnimation(.linear(duration: 18.0).repeatForever(autoreverses: false)) {
-                scanlineY = 1.25
-            }
+            // Bỏ scanline bar chạy từ trên xuống — gây lag vì
+            // GeometryReader + offset(...) + blendMode(.screen) render
+            // liên tục. Chỉ giữ pulse của radial glow phía trên.
             withAnimation(.easeInOut(duration: 10.0).repeatForever(autoreverses: true)) {
                 glowPhase = .pi
             }
@@ -205,14 +184,6 @@ private struct TechScanlineOverlay: Shape {
             path.addRect(CGRect(x: 0, y: y, width: rect.width, height: 1))
             y += 3
         }
-        return path
-    }
-}
-
-private struct ScanlineBar: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.addRoundedRect(in: rect, cornerSize: CGSize(width: 40, height: 40))
         return path
     }
 }
