@@ -180,15 +180,21 @@ struct GameCardView: View {
     var body: some View {
         VStack(spacing: 0) {
             ZStack {
+                // Banner đã được làm MỜ hơn để ảnh nền (`Background.imageset`) lấp
+                // ló qua các thẻ game. Trước đây opacity full → 0.6 → 0.4 che kín
+                // ảnh nền; giờ giảm còn 0.55 → 0.28 → 0.18, đồng thời thêm lớp
+                // `.blendMode(.plusLighter)` ở cuối để giữ màu neon vẫn pop mà
+                // không chặn hoàn toàn background.
                 LinearGradient(
                     colors: [
-                        bannerColor,
-                        bannerColor.opacity(0.6),
-                        Color.black.opacity(0.4),
+                        bannerColor.opacity(0.55),
+                        bannerColor.opacity(0.28),
+                        Color.black.opacity(0.18),
                     ],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
+                .blendMode(.plusLighter)
                 // Sheen sweep removed: it was an 8s `repeatForever` LinearGradient
                 // offset + rotation + `blendMode(.overlay)` running on EVERY card
                 // in the home grid. With 8–15 game cards visible at once that was

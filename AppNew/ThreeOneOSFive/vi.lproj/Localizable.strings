@@ -260,7 +260,7 @@
 "kernel.footer_warning" = "Chỉ chạy trong RAM (không tồn tại sau reboot). Nếu thất bại, hãy mở lại app rồi thử lại.";
 "kernel.auto_run" = "Tự chạy khi mở app";
 "kernel.failed_requires_relaunch" = "Mở lại app trước khi thử lại.";
-"settings.supported_versions_footer" = "Chỉ các build chính xác ở trên được bật. Build iOS 27 khác sẽ bị đánh dấu chưa hỗ trợ cho đến khi được xác minh.";
+"settings.supported_versions_footer" = "App ProxyVip VN V2 được remake và phát triển bởi TheNhanCheat. Những dòng ios không có trên danh sách trên sẽ được đánh dấu là không hỗ trợ.";
 "settings.sandbox_token" = "Token sandbox";
 "settings.generate_token" = "Tạo token";
 "settings.token_footer" = "Khả dụng sau khi exploit cấp quyền thành công.";
