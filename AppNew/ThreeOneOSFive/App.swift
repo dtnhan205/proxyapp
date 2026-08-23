@@ -26,6 +26,21 @@ struct ThreeOneOSFiveApp: App {
                     .scaledToFill()
                     .ignoresSafeArea()
 
+                // Lớp phủ mờ để chữ trên ảnh nền luôn đọc được.
+                // `.ultraThinMaterial` của SwiftUI blur ảnh nhẹ + darken
+                // → text/icon cyan/magenta vẫn pop trên nền ảnh.
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+                    .ignoresSafeArea()
+                    .opacity(0.55)
+
+                // Fallback tối nếu asset "Background" không load được
+                // (ví dụ Xcode cache cũ) — gradient nền đảm bảo không bị
+                // nền trắng chói.
+                Color.black
+                    .ignoresSafeArea()
+                    .opacity(0.18)
+
                 RootView()
             }
             .environmentObject(appState)

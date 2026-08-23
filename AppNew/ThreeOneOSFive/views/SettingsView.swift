@@ -8,8 +8,9 @@ struct SettingsView: View {
 
     var body: some View {
         ZStack {
-            TechBackground()
-                .accessibilityHidden(true)
+            // Nền ảnh được paint ở App.swift (Image("Background") trong ZStack
+            // gốc của WindowGroup) → đã phủ kín mọi màn hình, không cần
+            // TechBackground() riêng cho Settings.
 
             NavigationStack {
                 ScrollView {
