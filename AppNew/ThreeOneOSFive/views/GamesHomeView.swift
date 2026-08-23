@@ -20,61 +20,13 @@ struct GamesHomeView: View {
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
 
-                    LazyVGrid(columns: columns, spacing: 14) {
-                        ForEach(Array(games.enumerated()), id: \.element.id) { index, game in
-                            Button {
-                                selectedGame = game
-                                showingGamePatches = true
-                            } label: {
-                                GameCardView(
-                                    title: game.name,
-                                    subtitle: game.bundleID.isEmpty ? " " : game.bundleID,
-                                    bannerColor: Color(hex: game.bannerColor) ?? AppTheme.neonCyan,
-                                    iconURL: game.iconURL,
-                                    systemIconName: "app.fill",
-                                    accent: AppTheme.rowColor(index)
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(16)
-                    .animation(.easeOut(duration: 0.3), value: games)
-                    .navigationDestinationCompat(isPresented: $showingGamePatches) {
-                        if let game = selectedGame {
-                            GamePatchesView(game: game, store: store)
-                        }
-                    }
+                gamesGrid
 
-                    if games.isEmpty && !isLoadingGames {
-                        Text(language.text("patch.no_games_yet"))
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 32)
-                            .padding(.top, 8)
-                    }
-                }
+                emptyStatePlaceholder
+            }
             .navigationTitle(AppBranding.string("tabHome", locale: language.rawValue))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    HStack(spacing: 4) {
-                        PulsingDot(color: AppTheme.neonLime, size: 6)
-                        NeonReadout(text: "ONLINE", tint: AppTheme.neonLime)
-                    }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    NavigationLink {
-                        SettingsView()
-                    } label: {
-                        Image(systemName: "gearshape")
-                            .foregroundStyle(AppTheme.neonCyan)
-                            .shadow(color: AppTheme.neonCyan.opacity(0.6), radius: 4)
-                    }
-                    .accessibilityLabel(AppBranding.string("tabSettings", locale: language.rawValue))
-                }
-            }
+            .toolbar { homeToolbar }
             .toolbarBackground(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .refreshable { await loadGames() }
@@ -89,10 +41,75 @@ struct GamesHomeView: View {
                     draftCoordinator.clear()
                 }
             }
-
         }
         .tint(AppTheme.neonCyan)
         .preferredColorScheme(.dark)
+    }
+
+    /// Grid chứa danh sách game — tách riêng để Swift type-checker xử lý
+    /// được trong thời gian hợp lý (tránh timeout compile ở build -O).
+    private var gamesGrid: some View {
+        LazyVGrid(columns: columns, spacing: 14) {
+            ForEach(Array(games.enumerated()), id: \.element.id) { index, game in
+                gameCardButton(for: game, at: index)
+            }
+        }
+        .padding(16)
+        .animation(.easeOut(duration: 0.3), value: games)
+        .navigationDestinationCompat(isPresented: $showingGamePatches) {
+            if let game = selectedGame {
+                GamePatchesView(game: game, store: store)
+            }
+        }
+    }
+
+    private func gameCardButton(for game: RemoteGameSummary, at index: Int) -> some View {
+        Button {
+            selectedGame = game
+            showingGamePatches = true
+        } label: {
+            GameCardView(
+                title: game.name,
+                subtitle: game.bundleID.isEmpty ? " " : game.bundleID,
+                bannerColor: Color(hex: game.bannerColor) ?? AppTheme.neonCyan,
+                iconURL: game.iconURL,
+                systemIconName: "app.fill",
+                accent: AppTheme.rowColor(index)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private var emptyStatePlaceholder: some View {
+        if games.isEmpty && !isLoadingGames {
+            Text(language.text("patch.no_games_yet"))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+                .padding(.top, 8)
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var homeToolbar: some ToolbarContent {
+        ToolbarItem(placement: .navigationBarLeading) {
+            HStack(spacing: 4) {
+                PulsingDot(color: AppTheme.neonLime, size: 6)
+                NeonReadout(text: "ONLINE", tint: AppTheme.neonLime)
+            }
+        }
+        ToolbarItem(placement: .navigationBarTrailing) {
+            NavigationLink {
+                SettingsView()
+            } label: {
+                Image(systemName: "gearshape")
+                    .foregroundStyle(AppTheme.neonCyan)
+                    .shadow(color: AppTheme.neonCyan.opacity(0.6), radius: 4)
+            }
+            .accessibilityLabel(AppBranding.string("tabSettings", locale: language.rawValue))
+        }
     }
 
     private func loadGames() async {
@@ -142,7 +159,7 @@ struct GamesHomeView: View {
         }
         return version
     }
-
+}
 
 struct GameCardView: View {
     let title: String
