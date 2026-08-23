@@ -142,7 +142,7 @@ struct GamesHomeView: View {
         }
         return version
     }
-}
+
 
 struct GameCardView: View {
     let title: String
