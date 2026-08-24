@@ -2,6 +2,33 @@ import CryptoKit
 import Darwin
 import Foundation
 
+// MARK: - Patch Transaction Logging Helper
+/// Logs messages via PatchLogService (main actor) or falls back to print
+func patchLog(_ message: String) {
+    let msg = "[PATCH] \(message)"
+    Task { @MainActor in
+        PatchLogService.shared.info(msg)
+    }
+}
+func patchLogError(_ message: String) {
+    let msg = "[PATCH] \(message)"
+    Task { @MainActor in
+        PatchLogService.shared.error(msg)
+    }
+}
+func patchLogDebug(_ message: String) {
+    let msg = "[PATCH] \(message)"
+    Task { @MainActor in
+        PatchLogService.shared.debug(msg)
+    }
+}
+func patchLogSuccess(_ message: String) {
+    let msg = "[PATCH] \(message)"
+    Task { @MainActor in
+        PatchLogService.shared.success(msg)
+    }
+}
+
 struct PatchTransactionReceipt: Equatable, Identifiable {
     let id: UUID
     let projectID: UUID
@@ -67,6 +94,7 @@ enum PatchTransaction {
         fileManager: FileManager = .default
     ) throws -> PatchTransactionReceipt {
         guard !project.rules.isEmpty || !project.directories.isEmpty else {
+            patchLogError("Invalid project: no rules or directories")
             throw PatchPackageError.invalidProject
         }
 
@@ -74,6 +102,9 @@ enum PatchTransaction {
         var resolvedRules: [ResolvedRule] = []
         var resolvedDirectories: [ResolvedDirectory] = []
         var targetKeys = Set<String>()
+
+        patchLog("Starting apply for project: \(project.name) (\(project.id.uuidString.prefix(8))...)")
+        patchLogDebug("Rules: \(project.rules.count), Directories: \(project.directories.count)")
 
         func resolvedRoot(for bundleID: String) throws -> URL {
             if let cached = roots[bundleID] { return cached }
@@ -150,8 +181,10 @@ enum PatchTransaction {
             .appendingPathComponent(project.id.uuidString, isDirectory: true)
             .appendingPathComponent(transactionID.uuidString, isDirectory: true)
         do {
+            patchLogDebug("Creating transaction directory: \(transactionDirectory.path)")
             try fileManager.createDirectory(at: transactionDirectory, withIntermediateDirectories: true)
         } catch {
+            patchLogError("Failed to create transaction directory: \(error.localizedDescription)")
             throw PatchPackageError.applyFailed
         }
 
@@ -209,12 +242,14 @@ enum PatchTransaction {
 
         do {
             for resolved in resolvedDirectories where !fileManager.fileExists(atPath: resolved.target.path) {
+                patchLogDebug("Creating directory: \(resolved.target.path)")
                 try fileManager.createDirectory(
                     at: resolved.target,
                     withIntermediateDirectories: false
                 )
             }
             for (index, resolved) in resolvedRules.enumerated() {
+                patchLogDebug("[\(index + 1)/\(resolvedRules.count)] Writing: \(resolved.target.lastPathComponent)")
                 try beforeWrite?(index)
                 try atomicWrite(
                     resolved.rule.replacementData,
@@ -223,11 +258,14 @@ enum PatchTransaction {
                     fileManager: fileManager
                 )
                 guard try digestFile(resolved.target) == records[index].replacementDigest else {
+                    patchLogError("Digest mismatch after write: \(resolved.target.path)")
                     throw PatchPackageError.applyFailed
                 }
+                patchLog("[\(index + 1)/\(resolvedRules.count)] Written: \(resolved.rule.relativePath)")
             }
             journal.status = .applied
             try writeJournal(journal, to: journalURL)
+            patchLogSuccess("Apply complete: \(resolvedRules.count) files patched")
             return PatchTransactionReceipt(
                 id: transactionID,
                 projectID: project.id,
@@ -257,10 +295,13 @@ enum PatchTransaction {
         containerResolver: (String) throws -> URL,
         fileManager: FileManager = .default
     ) throws {
+        patchLog("Starting restore for receipt: \(receipt.id.uuidString.prefix(8))...")
+        
         var journal: Journal
         do {
             journal = try readJournal(receipt.journalURL)
         } catch {
+            patchLogError("Failed to read journal: \(error.localizedDescription)")
             throw PatchPackageError.restoreFailed
         }
         guard journal.schemaVersion == schemaVersion,
@@ -268,14 +309,18 @@ enum PatchTransaction {
               journal.projectID == receipt.projectID,
               journal.status == .applied || journal.status == .prepared
         else {
+            patchLogError("Invalid journal state or mismatch")
             throw PatchPackageError.restoreFailed
         }
 
+        patchLog("Restoring \(journal.records.count) files, status: \(journal.status.rawValue)")
+        
         var roots: [String: URL] = [:]
         do {
             for record in journal.records where roots[record.bundleID] == nil {
                 let root = PatchPathValidator.canonicalFileURL(try containerResolver(record.bundleID))
                 guard containerFingerprint(root) == record.containerFingerprint else {
+                    patchLogError("Container fingerprint mismatch for bundleID: \(record.bundleID)")
                     throw PatchPackageError.restoreFailed
                 }
                 roots[record.bundleID] = root
@@ -290,7 +335,9 @@ enum PatchTransaction {
             )
             journal.status = .restored
             try writeJournal(journal, to: receipt.journalURL)
+            patchLogSuccess("Restore complete: \(journal.records.count) files restored")
         } catch {
+            patchLogError("Restore failed: \(error.localizedDescription)")
             throw PatchPackageError.restoreFailed
         }
     }
@@ -549,16 +596,21 @@ enum PatchTransaction {
         let data: Data
         if isOn {
             data = rule.replacementData
+            patchLog("[\(rule.relativePath)] Enabling patch...")
         } else {
             guard let originalData = rule.originalData else {
+                patchLogError("[\(rule.relativePath)] No original data available")
                 throw PatchPackageError.invalidProject
             }
             data = originalData
+            patchLog("[\(rule.relativePath)] Restoring original...")
         }
         let root = PatchPathValidator.canonicalFileURL(containerRoot)
         let target = try PatchPathValidator.resolveContainedTargetURL(relativePath: rule.relativePath, containerRoot: root)
+        patchLogDebug("[\(rule.relativePath)] Target: \(target.path)")
         try validateTarget(target, relativePath: rule.relativePath, containerRoot: root, fileManager: fileManager)
         try atomicWrite(data, to: target, preservingExistingAttributes: true, fileManager: fileManager)
+        patchLogSuccess("[\(rule.relativePath)] \(isOn ? "Patch applied" : "Restored")")
     }
 
     /// Reads back whatever is currently on disk for this rule and reports whether it matches

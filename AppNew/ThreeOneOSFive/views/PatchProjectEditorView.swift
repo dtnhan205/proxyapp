@@ -16,6 +16,8 @@ struct PatchProjectEditorView: View {
     @State private var password = ""
     @State private var ruleEditor: PatchRuleEditorContext?
     @State private var validationMessageKey: String?
+    @State private var showPatchLog = false
+    @ObservedObject private var patchLogService = PatchLogService.shared
 
     init(
         existingProject: PatchProject?,
@@ -143,6 +145,15 @@ struct PatchProjectEditorView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(language.text("common.done"), action: save)
                 }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        showPatchLog.toggle()
+                    } label: {
+                        Image(systemName: showPatchLog ? "terminal.fill" : "terminal")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(showPatchLog ? AppTheme.neonMagenta : AppTheme.neonCyan)
+                    }
+                }
             }
             .sheet(item: $ruleEditor) { context in
                 PatchRuleEditorView(rule: context.rule) { savedRule in
@@ -155,7 +166,94 @@ struct PatchProjectEditorView: View {
             }
             .scrollContentBackground(.hidden)
             .appBackground()
+            .overlay(alignment: .bottom) {
+                if showPatchLog {
+                    patchLogOverlay
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                }
+            }
+            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showPatchLog)
         }
+    }
+
+    // MARK: - Patch Log Overlay
+    private var patchLogOverlay: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("PATCH LOG")
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .foregroundStyle(AppTheme.neonCyan)
+                Spacer()
+                Button {
+                    let text = patchLogService.logs.map { "\($0.formattedTime) \($0.level.icon) \($0.message)" }.joined(separator: "\n")
+                    UIPasteboard.general.string = text
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(AppTheme.neonCyan)
+                }
+                Button {
+                    patchLogService.clear()
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                Button {
+                    showPatchLog = false
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 18))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color.black.opacity(0.9))
+
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 2) {
+                        ForEach(patchLogService.logs) { entry in
+                            HStack(alignment: .top, spacing: 6) {
+                                Text(entry.formattedTime)
+                                    .font(.system(size: 9, design: .monospaced))
+                                    .foregroundStyle(.gray)
+                                Image(systemName: entry.level.icon)
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(entry.level.color)
+                                Text(entry.message)
+                                    .font(.system(size: 10, design: .monospaced))
+                                    .foregroundStyle(entry.level.color)
+                                    .textSelection(.enabled)
+                                Spacer()
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .id(entry.id)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+                .background(Color.black.opacity(0.95))
+                .onChange(of: patchLogService.logs.count) { _ in
+                    if let lastLog = patchLogService.logs.last {
+                        withAnimation {
+                            proxy.scrollTo(lastLog.id, anchor: .bottom)
+                        }
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: 280)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(AppTheme.neonMagenta.opacity(0.4), lineWidth: 1)
+        )
+        .shadow(color: AppTheme.neonMagenta.opacity(0.3), radius: 10)
+        .padding(.horizontal, 8)
+        .padding(.bottom, 8)
     }
 
     private func ruleRow(_ rule: PatchRule) -> some View {
