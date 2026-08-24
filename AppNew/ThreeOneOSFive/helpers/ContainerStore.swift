@@ -96,13 +96,90 @@ enum ContainerStore {
             log("patch: metadata scan unavailable — no containers enumerated")
             return nil
         }
+        log("patch: scanning \(dirs.count) containers for \(bundleID)")
+
+        // Method 1: Read metadata plist (standard path)
         for dir in dirs {
             guard UUID(uuidString: (dir as NSString).lastPathComponent) != nil else { continue }
-            guard let metadata = readContainerMetadata(containerPath: dir),
-                  metadata.bundleID == bundleID else { continue }
-            let canonical = ContainerDiscoveryMerger.canonicalPath(dir)
-            guard isApplicationContainerPath(canonical) else { continue }
-            return canonical
+
+            // Verify container exists
+            var statBuf = stat()
+            if stat(dir, &statBuf) != 0 {
+                log("patch: cannot stat \(dir), skipping")
+                continue
+            }
+
+            if let metadata = readContainerMetadata(containerPath: dir) {
+                if metadata.bundleID == bundleID {
+                    let canonical = ContainerDiscoveryMerger.canonicalPath(dir)
+                    guard isApplicationContainerPath(canonical) else { continue }
+                    log("patch: metadata scan resolved \(bundleID) -> \(canonical)")
+                    return canonical
+                }
+            }
+        }
+
+        // Method 2: Try to find via bundle path
+        log("patch: metadata plist scan failed, trying bundle path scan")
+        for (rootPath, nested) in applicationBundleRoots {
+            if let containerPath = findContainerViaBundlePath(bundleID: bundleID, rootPath: rootPath, nested: nested) {
+                log("patch: bundle path scan resolved \(bundleID) -> \(containerPath)")
+                return containerPath
+            }
+        }
+
+        log("patch: metadata scan completed — \(bundleID) not found")
+        return nil
+    }
+
+    /// Fallback: Find container by scanning bundle paths and extracting UUID from symlinks
+    private static func findContainerViaBundlePath(bundleID: String, rootPath: String, nested: Bool) -> String? {
+        let bundleDirs = enumerateDirectories(path: rootPath)
+        for bundleDir in bundleDirs {
+            let infoPlistPath = (bundleDir as NSString).appendingPathComponent("Info.plist")
+            if let plistData = try? Data(contentsOf: URL(fileURLWithPath: infoPlistPath)),
+               let plist = try? PropertyListSerialization.propertyList(from: plistData, options: [], format: nil) as? [String: Any],
+               let foundBundleID = plist["CFBundleIdentifier"] as? String,
+               foundBundleID == bundleID {
+
+                // Get the UUID from the parent directory
+                let parentDir = (bundleDir as NSString).deletingLastPathComponent
+                let uuid = (parentDir as NSString).lastPathComponent
+
+                // Try to construct data container path
+                let dataContainerPath = (appDataRoot as NSString).appendingPathComponent(uuid)
+                if FileManager.default.fileExists(atPath: dataContainerPath) {
+                    return dataContainerPath
+                }
+
+                // Alternative: check if Documents folder exists
+                let docsPath = (dataContainerPath as NSString).appendingPathComponent("Documents")
+                if FileManager.default.fileExists(atPath: docsPath) {
+                    return dataContainerPath
+                }
+            }
+
+            // For nested structure, scan subdirectories
+            if nested {
+                let subDirs = enumerateDirectories(path: bundleDir)
+                for subDir in subDirs {
+                    let infoPlistPath = (subDir as NSString).appendingPathComponent("Info.plist")
+                    if let plistData = try? Data(contentsOf: URL(fileURLWithPath: infoPlistPath)),
+                       let plist = try? PropertyListSerialization.propertyList(from: plistData, options: [], format: nil) as? [String: Any],
+                       let foundBundleID = plist["CFBundleIdentifier"] as? String,
+                       foundBundleID == bundleID {
+
+                        let parentDir = (subDir as NSString).deletingLastPathComponent
+                        let grandparentDir = (parentDir as NSString).deletingLastPathComponent
+                        let uuid = (parentDir as NSString).lastPathComponent
+
+                        let dataContainerPath = (appDataRoot as NSString).appendingPathComponent(uuid)
+                        if FileManager.default.fileExists(atPath: dataContainerPath) {
+                            return dataContainerPath
+                        }
+                    }
+                }
+            }
         }
         return nil
     }
@@ -458,10 +535,38 @@ enum ContainerStore {
     }
 
     static func readContainerMetadata(containerPath: String) -> ContainerMetadata? {
-        let metadataPath = metadataPath(for: containerPath)
+        // Try multiple possible metadata paths
+        let possiblePaths = [
+            metadataPath(for: containerPath),
+            (containerPath as NSString).appendingPathComponent(".MCMMetadata.plist"),
+            (containerPath as NSString).appendingPathComponent("Documents/.com.apple.mobile_container_manager.metadata.plist"),
+            (appDataRoot as NSString).appendingPathComponent("../../../Shared/AppGen/\((containerPath as NSString).lastPathComponent)/MCMMetadata.plist")
+        ]
 
+        for metadataPath in possiblePaths {
+            log("patch: trying metadata at \(metadataPath)")
+            if let metadata = tryReadMetadataFile(at: metadataPath) {
+                log("patch: found metadata at \(metadataPath): bundleID=\(metadata.bundleID)")
+                return metadata
+            }
+        }
+
+        // Last resort: try to find Info.plist and extract bundle ID
+        if let bundleIDFromInfo = extractBundleIDFromContainer(containerPath) {
+            log("patch: extracted bundleID from container: \(bundleIDFromInfo)")
+            return ContainerMetadata(bundleID: bundleIDFromInfo, displayName: "")
+        }
+
+        log("patch: no metadata found for \(containerPath)")
+        return nil
+    }
+
+    private static func tryReadMetadataFile(at path: String) -> ContainerMetadata? {
         var data: Data?
-        if let fd = fopen(metadataPath, "r") {
+
+        // Try fopen first
+        if let fd = fopen(path, "r") {
+            defer { fclose(fd) }
             var buffer = [UInt8](repeating: 0, count: 65536)
             var bytes: [UInt8] = []
             while true {
@@ -469,13 +574,17 @@ enum ContainerStore {
                 if n <= 0 { break }
                 bytes.append(contentsOf: buffer[0..<n])
             }
-            fclose(fd)
             if !bytes.isEmpty { data = Data(bytes) }
         }
-        if data == nil { data = try? Data(contentsOf: URL(fileURLWithPath: metadataPath)) }
 
-        guard let validData = data,
-              let plist = try? PropertyListSerialization.propertyList(from: validData, options: [], format: nil) as? [String: Any] else {
+        // Try FileManager
+        if data == nil {
+            data = try? Data(contentsOf: URL(fileURLWithPath: path))
+        }
+
+        guard let validData = data else { return nil }
+
+        guard let plist = try? PropertyListSerialization.propertyList(from: validData, options: [], format: nil) as? [String: Any] else {
             return nil
         }
 
@@ -484,7 +593,22 @@ enum ContainerStore {
         if let info = plist["MCMMetadataInfo"] as? [String: Any] {
             displayName = (info["CFBundleDisplayName"] as? String) ?? (info["CFBundleName"] as? String) ?? ""
         }
-        return ContainerMetadata(bundleID: bundleID, displayName: displayName)
+
+        if !bundleID.isEmpty {
+            return ContainerMetadata(bundleID: bundleID, displayName: displayName)
+        }
+        return nil
+    }
+
+    private static func extractBundleIDFromContainer(_ containerPath: String) -> String? {
+        // Try Info.plist in the bundle directory
+        let infoPlistPath = (containerPath as NSString).appendingPathComponent("Info.plist")
+        if let data = try? Data(contentsOf: URL(fileURLWithPath: infoPlistPath)),
+           let plist = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any],
+           let bundleID = plist["CFBundleIdentifier"] as? String {
+            return bundleID
+        }
+        return nil
     }
 
     static func metadataPath(for containerPath: String) -> String {
