@@ -17,7 +17,7 @@ struct PatchProjectEditorView: View {
     @State private var ruleEditor: PatchRuleEditorContext?
     @State private var validationMessageKey: String?
     @State private var showPatchLog = false
-    @ObservedObject private var patchLogService = PatchLogService.shared
+    @ObservedObject private var appLog = AppLog.shared
 
     init(
         existingProject: PatchProject?,
@@ -147,11 +147,25 @@ struct PatchProjectEditorView: View {
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
+                        DevicePatchService.isLoggingEnabled.toggle()
+                        if DevicePatchService.isLoggingEnabled {
+                            AppLog.shared.append("[3105] Patch logging enabled")
+                        } else {
+                            AppLog.shared.append("[3105] Patch logging disabled")
+                        }
+                    } label: {
+                        Image(systemName: DevicePatchService.isLoggingEnabled ? "terminal.fill" : "terminal")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(DevicePatchService.isLoggingEnabled ? AppTheme.neonCyan : .secondary)
+                    }
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
                         showPatchLog.toggle()
                     } label: {
-                        Image(systemName: showPatchLog ? "terminal.fill" : "terminal")
+                        Image(systemName: showPatchLog ? "list.bullet.rectangle.portrait.fill" : "list.bullet.rectangle.portrait")
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(showPatchLog ? AppTheme.neonMagenta : AppTheme.neonCyan)
+                            .foregroundStyle(showPatchLog ? AppTheme.neonMagenta : .secondary)
                     }
                 }
             }
@@ -185,7 +199,11 @@ struct PatchProjectEditorView: View {
                     .foregroundStyle(AppTheme.neonCyan)
                 Spacer()
                 Button {
-                    let text = patchLogService.logs.map { "\($0.formattedTime) \($0.level.icon) \($0.message)" }.joined(separator: "\n")
+                    var text = ""
+                    text += "3105 Log\n"
+                    text += "iOS \(AppInfo.osVersion) (\(AppInfo.osBuild))\n"
+                    text += "Generated: \(Date())\n\n"
+                    text += appLog.entries.joined(separator: "\n")
                     UIPasteboard.general.string = text
                 } label: {
                     Image(systemName: "doc.on.doc")
@@ -193,7 +211,7 @@ struct PatchProjectEditorView: View {
                         .foregroundStyle(AppTheme.neonCyan)
                 }
                 Button {
-                    patchLogService.clear()
+                    appLog.entries.removeAll()
                 } label: {
                     Image(systemName: "trash")
                         .font(.system(size: 12, weight: .semibold))
@@ -214,32 +232,24 @@ struct PatchProjectEditorView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 2) {
-                        ForEach(patchLogService.logs) { entry in
-                            HStack(alignment: .top, spacing: 6) {
-                                Text(entry.formattedTime)
-                                    .font(.system(size: 9, design: .monospaced))
-                                    .foregroundStyle(.gray)
-                                Image(systemName: entry.level.icon)
-                                    .font(.system(size: 9))
-                                    .foregroundStyle(entry.level.color)
-                                Text(entry.message)
-                                    .font(.system(size: 10, design: .monospaced))
-                                    .foregroundStyle(entry.level.color)
-                                    .textSelection(.enabled)
-                                Spacer()
-                            }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 2)
-                            .id(entry.id)
+                        ForEach(Array(appLog.entries.enumerated()), id: \.offset) { index, entry in
+                            Text(entry)
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundStyle(.primary)
+                                .textSelection(.enabled)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 2)
+                                .id(index)
                         }
                     }
                     .padding(.vertical, 4)
                 }
                 .background(Color.black.opacity(0.95))
-                .onChange(of: patchLogService.logs.count) { _ in
-                    if let lastLog = patchLogService.logs.last {
+                .onChange(of: appLog.entries.count) { count in
+                    if count > 0 {
                         withAnimation {
-                            proxy.scrollTo(lastLog.id, anchor: .bottom)
+                            proxy.scrollTo(count - 1, anchor: .bottom)
                         }
                     }
                 }
