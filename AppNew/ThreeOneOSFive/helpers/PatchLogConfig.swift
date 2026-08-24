@@ -6,7 +6,9 @@ import os.log
 enum PatchLogConfig {
     /// Compile-time flag to completely disable logging
     /// bật tắt log
-    static let loggingDisabled: Bool = true
+    /// - false: bật log
+    /// - true: tắt log
+    static let loggingDisabled: Bool = false
 
     /// Log subsystem identifier for os_log
     static let subsystem = "com.threeoneos.five"
