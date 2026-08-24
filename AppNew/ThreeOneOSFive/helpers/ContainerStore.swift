@@ -98,16 +98,17 @@ enum ContainerStore {
         }
         log("patch: scanning \(dirs.count) containers for \(bundleID)")
 
-        // Method 1: Read metadata plist (standard path)
+        // Method 1: Read metadata plist with bad_query grant
         for dir in dirs {
             guard UUID(uuidString: (dir as NSString).lastPathComponent) != nil else { continue }
 
-            // Verify container exists
-            var statBuf = stat()
-            if stat(dir, &statBuf) != 0 {
-                log("patch: cannot stat \(dir), skipping")
+            // Grant access to container before reading
+            let handle = grantContainerAccess(dir)
+            if handle < 0 {
+                log("patch: cannot grant access to \(dir)")
                 continue
             }
+            defer { bad_query_release(handle) }
 
             if let metadata = readContainerMetadata(containerPath: dir) {
                 if metadata.bundleID == bundleID {
@@ -134,49 +135,44 @@ enum ContainerStore {
 
     /// Fallback: Find container by scanning bundle paths and extracting UUID from symlinks
     private static func findContainerViaBundlePath(bundleID: String, rootPath: String, nested: Bool) -> String? {
+        log("patch: scanning bundle path \(rootPath) for \(bundleID)")
+
+        // Use enumerateDirectories which has bad_query fallback
         let bundleDirs = enumerateDirectories(path: rootPath)
-        for bundleDir in bundleDirs {
-            let infoPlistPath = (bundleDir as NSString).appendingPathComponent("Info.plist")
-            if let plistData = try? Data(contentsOf: URL(fileURLWithPath: infoPlistPath)),
-               let plist = try? PropertyListSerialization.propertyList(from: plistData, options: [], format: nil) as? [String: Any],
+        log("patch: found \(bundleDirs.count) items in \(rootPath)")
+
+        // For each UUID in appDataRoot, check if its bundle exists in /var/containers/Bundle/Application
+        let dataContainerUUIDs = enumerateDirectories(path: appDataRoot)
+        log("patch: found \(dataContainerUUIDs.count) data containers, scanning for \(bundleID)")
+
+        for dataContainer in dataContainerUUIDs {
+            let uuid = (dataContainer as NSString).lastPathComponent
+            guard UUID(uuidString: uuid) != nil else { continue }
+
+            // Construct potential bundle path
+            let potentialBundlePath = (rootPath as NSString).appendingPathComponent(uuid)
+            let infoPlistPath = (potentialBundlePath as NSString).appendingPathComponent("Info.plist")
+
+            // Try to read Info.plist from bundle
+            if let data = try? Data(contentsOf: URL(fileURLWithPath: infoPlistPath)),
+               let plist = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any],
                let foundBundleID = plist["CFBundleIdentifier"] as? String,
                foundBundleID == bundleID {
-
-                // Get the UUID from the parent directory
-                let parentDir = (bundleDir as NSString).deletingLastPathComponent
-                let uuid = (parentDir as NSString).lastPathComponent
-
-                // Try to construct data container path
-                let dataContainerPath = (appDataRoot as NSString).appendingPathComponent(uuid)
-                if FileManager.default.fileExists(atPath: dataContainerPath) {
-                    return dataContainerPath
-                }
-
-                // Alternative: check if Documents folder exists
-                let docsPath = (dataContainerPath as NSString).appendingPathComponent("Documents")
-                if FileManager.default.fileExists(atPath: docsPath) {
-                    return dataContainerPath
-                }
+                log("patch: found match! bundleID=\(bundleID) UUID=\(uuid)")
+                return dataContainer
             }
 
-            // For nested structure, scan subdirectories
+            // For nested structure, scan UUID/... directories
             if nested {
-                let subDirs = enumerateDirectories(path: bundleDir)
-                for subDir in subDirs {
+                let uuidDirContents = enumerateDirectories(path: potentialBundlePath)
+                for subDir in uuidDirContents {
                     let infoPlistPath = (subDir as NSString).appendingPathComponent("Info.plist")
-                    if let plistData = try? Data(contentsOf: URL(fileURLWithPath: infoPlistPath)),
-                       let plist = try? PropertyListSerialization.propertyList(from: plistData, options: [], format: nil) as? [String: Any],
+                    if let data = try? Data(contentsOf: URL(fileURLWithPath: infoPlistPath)),
+                       let plist = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any],
                        let foundBundleID = plist["CFBundleIdentifier"] as? String,
                        foundBundleID == bundleID {
-
-                        let parentDir = (subDir as NSString).deletingLastPathComponent
-                        let grandparentDir = (parentDir as NSString).deletingLastPathComponent
-                        let uuid = (parentDir as NSString).lastPathComponent
-
-                        let dataContainerPath = (appDataRoot as NSString).appendingPathComponent(uuid)
-                        if FileManager.default.fileExists(atPath: dataContainerPath) {
-                            return dataContainerPath
-                        }
+                        log("patch: found match (nested)! bundleID=\(bundleID) UUID=\(uuid)")
+                        return dataContainer
                     }
                 }
             }
@@ -582,9 +578,26 @@ enum ContainerStore {
             data = try? Data(contentsOf: URL(fileURLWithPath: path))
         }
 
-        guard let validData = data else { return nil }
+        // Debug: log file existence and size
+        let fileManager = FileManager.default
+        if fileManager.fileExists(atPath: path) {
+            if let attrs = try? fileManager.attributesOfItem(atPath: path),
+               let size = attrs[.size] as? Int64 {
+                log("patch: file exists at \(path), size=\(size)")
+            }
+        } else {
+            log("patch: file NOT exists at \(path)")
+        }
 
+        guard let validData = data else { return nil }
+        log("patch: read \(validData.count) bytes from \(path)")
+
+        // Try to parse as plist
         guard let plist = try? PropertyListSerialization.propertyList(from: validData, options: [], format: nil) as? [String: Any] else {
+            // Try XML format
+            if let xmlString = String(data: validData, encoding: .utf8) {
+                log("patch: raw content (first 200 chars): \(String(xmlString.prefix(200)))")
+            }
             return nil
         }
 
