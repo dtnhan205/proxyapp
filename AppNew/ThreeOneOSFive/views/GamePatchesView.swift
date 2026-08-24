@@ -73,18 +73,18 @@ struct GamePatchesView: View {
                             NeonReadout(text: "SYNC", tint: AppTheme.neonCyan)
                         }
                     }
-                    // Toggle verbose logging button
+                    // Toggle logging button
                     Button {
-                        PatchLogConfig.verboseEnabled.toggle()
-                        if PatchLogConfig.verboseEnabled {
-                            AppLog.shared.append("[3105] Verbose logging enabled")
+                        DevicePatchService.isLoggingEnabled.toggle()
+                        if DevicePatchService.isLoggingEnabled {
+                            AppLog.shared.append("[3105] Patch logging enabled")
                         } else {
-                            AppLog.shared.append("[3105] Verbose logging disabled")
+                            AppLog.shared.append("[3105] Patch logging disabled")
                         }
                     } label: {
-                        Image(systemName: PatchLogConfig.verboseEnabled ? "terminal.fill" : "terminal")
+                        Image(systemName: DevicePatchService.isLoggingEnabled ? "terminal.fill" : "terminal")
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(PatchLogConfig.verboseEnabled ? AppTheme.neonCyan : .secondary)
+                            .foregroundStyle(DevicePatchService.isLoggingEnabled ? AppTheme.neonCyan : .secondary)
                     }
                     // Show log panel button
                     Button {

@@ -1,17 +1,58 @@
 import Foundation
-import os.log
+
+/// Compile-time flag to disable all patch logging in release builds
+/// Set to false to ENABLE logging (debug/development)
+/// Set to true to DISABLE logging (release/production)
+private let isLoggingDisabled: Bool = true
 
 enum DevicePatchService {
+    /// Runtime toggle for verbose logging (only works when isLoggingDisabled = false)
+    static var isLoggingEnabled: Bool = false
+
+    @inline(__always)
+    private static func log(_ message: String) {
+        #if PATCH_DISABLE_LOGGING
+        // Logs completely stripped in release builds
+        #else
+        if isLoggingDisabled { return }
+        if isLoggingEnabled {
+            print("[PATCH] \(message)")
+        }
+        #endif
+    }
+
+    @inline(__always)
+    private static func logInfo(_ message: String) {
+        #if PATCH_DISABLE_LOGGING
+        // No-op
+        #else
+        if isLoggingDisabled { return }
+        if isLoggingEnabled {
+            print("[PATCH] \(message)")
+        }
+        #endif
+    }
+
+    @inline(__always)
+    private static func logError(_ message: String) {
+        #if PATCH_DISABLE_LOGGING
+        // No-op
+        #else
+        if isLoggingDisabled { return }
+        print("[PATCH ERROR] \(message)")
+        #endif
+    }
+
     static func apply(project: PatchProject) throws -> PatchTransactionReceipt {
         let bundleIDs = orderedBundleIdentifiers(in: project)
-        patchLogInfo("Applying project: \(project.name)")
+        logInfo("Applying project: \(project.name)")
         return try withResolvedContainers(bundleIDs: bundleIDs) { roots in
             try PatchTransaction.apply(
                 project: project,
                 backupRoot: try PatchProjectLibrary.backupRootURL(),
                 containerResolver: { bundleID in
                     guard let root = roots[bundleID] else {
-                        patchLogError("App not found: \(bundleID)")
+                        logError("App not found: \(bundleID)")
                         throw PatchPackageError.targetAppUnavailable(bundleID)
                     }
                     return root
@@ -22,13 +63,13 @@ enum DevicePatchService {
 
     static func restore(receipt: PatchTransactionReceipt) throws {
         let bundleIDs = try PatchTransaction.requiredBundleIdentifiers(for: receipt)
-        patchLogInfo("Restoring receipt: \(receipt.id.uuidString.prefix(8))...")
+        logInfo("Restoring receipt: \(receipt.id.uuidString.prefix(8))...")
         try withResolvedContainers(bundleIDs: bundleIDs) { roots in
             try PatchTransaction.restore(
                 receipt: receipt,
                 containerResolver: { bundleID in
                     guard let root = roots[bundleID] else {
-                        patchLogError("App not found: \(bundleID)")
+                        logError("App not found: \(bundleID)")
                         throw PatchPackageError.targetAppUnavailable(bundleID)
                     }
                     return root
@@ -45,17 +86,17 @@ enum DevicePatchService {
     /// Toggle a single rule on/off instantly — no full project transaction needed
     /// because both contents (replacement + original) are bundled in the package.
     static func setRuleState(_ isOn: Bool, rule: PatchRule) throws {
-        patchLogInfo("\(isOn ? "Enabling" : "Disabling"): \(rule.relativePath)")
+        logInfo("\(isOn ? "Enabling" : "Disabling"): \(rule.relativePath)")
         try withResolvedContainers(bundleIDs: [rule.bundleID]) { roots in
             guard let root = roots[rule.bundleID] else {
-                patchLogError("Target app unavailable: \(rule.bundleID)")
+                logError("Target app unavailable: \(rule.bundleID)")
                 throw PatchPackageError.targetAppUnavailable(rule.bundleID)
             }
             do {
                 try PatchTransaction.setRuleState(isOn, rule: rule, containerRoot: root)
-                patchLogInfo("SUCCESS: \(isOn ? "Enabled" : "Disabled"): \(rule.relativePath)")
+                logInfo("SUCCESS: \(isOn ? "Enabled" : "Disabled"): \(rule.relativePath)")
             } catch {
-                patchLogError("\(error.localizedDescription)")
+                logError("\(error.localizedDescription)")
                 throw error
             }
         }
@@ -83,7 +124,7 @@ enum DevicePatchService {
         for bundleID in bundleIDs {
             guard let path = ContainerStore.resolveAppContainerPath(bundleID: bundleID),
                   ContainerStore.isApplicationContainerPath(path) else {
-                patchLogError("Cannot resolve container: \(bundleID)")
+                logError("Cannot resolve container: \(bundleID)")
                 throw PatchPackageError.targetAppUnavailable(bundleID)
             }
             roots[bundleID] = PatchPathValidator.canonicalFileURL(URL(fileURLWithPath: path, isDirectory: true))
