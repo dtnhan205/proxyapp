@@ -18,7 +18,7 @@ struct GamePatchesView: View {
     @AppStorage("patch.gameAssignments") private var gameAssignmentsRaw = "{}"
     @AppStorage("patch.remoteToLocalMap") private var remoteToLocalMapRaw = "{}"
 
-    @ObservedObject private var patchLogService = PatchLogService.shared
+    @ObservedObject private var appLog = AppLog.shared
 
     private var importedOnlineIDs: Set<String> {
         Set(importedOnlineIDsRaw.split(separator: ",").map(String.init))
@@ -73,13 +73,26 @@ struct GamePatchesView: View {
                             NeonReadout(text: "SYNC", tint: AppTheme.neonCyan)
                         }
                     }
-                    // Debug log button
+                    // Toggle verbose logging button
+                    Button {
+                        PatchLogConfig.verboseEnabled.toggle()
+                        if PatchLogConfig.verboseEnabled {
+                            AppLog.shared.append("[3105] Verbose logging enabled")
+                        } else {
+                            AppLog.shared.append("[3105] Verbose logging disabled")
+                        }
+                    } label: {
+                        Image(systemName: PatchLogConfig.verboseEnabled ? "terminal.fill" : "terminal")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(PatchLogConfig.verboseEnabled ? AppTheme.neonCyan : .secondary)
+                    }
+                    // Show log panel button
                     Button {
                         showPatchLog.toggle()
                     } label: {
-                        Image(systemName: showPatchLog ? "terminal.fill" : "terminal")
+                        Image(systemName: showPatchLog ? "list.bullet.rectangle.portrait.fill" : "list.bullet.rectangle.portrait")
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(showPatchLog ? AppTheme.neonMagenta : AppTheme.neonCyan)
+                            .foregroundStyle(showPatchLog ? AppTheme.neonMagenta : .secondary)
                     }
                 }
             }
@@ -539,14 +552,17 @@ struct GamePatchesView: View {
 
     private var patchLogOverlay: some View {
         VStack(spacing: 0) {
-            // Header
             HStack {
                 Text("PATCH LOG")
                     .font(.system(size: 12, weight: .bold, design: .monospaced))
                     .foregroundStyle(AppTheme.neonCyan)
                 Spacer()
                 Button {
-                    let text = patchLogService.logs.map { "\($0.formattedTime) \($0.level.icon) \($0.message)" }.joined(separator: "\n")
+                    var text = ""
+                    text += "3105 Log\n"
+                    text += "iOS \(AppInfo.osVersion) (\(AppInfo.osBuild))\n"
+                    text += "Generated: \(Date())\n\n"
+                    text += appLog.entries.joined(separator: "\n")
                     UIPasteboard.general.string = text
                 } label: {
                     Image(systemName: "doc.on.doc")
@@ -554,7 +570,7 @@ struct GamePatchesView: View {
                         .foregroundStyle(AppTheme.neonCyan)
                 }
                 Button {
-                    patchLogService.clear()
+                    appLog.entries.removeAll()
                 } label: {
                     Image(systemName: "trash")
                         .font(.system(size: 12, weight: .semibold))
@@ -572,36 +588,27 @@ struct GamePatchesView: View {
             .padding(.vertical, 8)
             .background(Color.black.opacity(0.9))
 
-            // Log entries
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 2) {
-                        ForEach(patchLogService.logs) { entry in
-                            HStack(alignment: .top, spacing: 6) {
-                                Text(entry.formattedTime)
-                                    .font(.system(size: 9, design: .monospaced))
-                                    .foregroundStyle(.gray)
-                                Image(systemName: entry.level.icon)
-                                    .font(.system(size: 9))
-                                    .foregroundStyle(entry.level.color)
-                                Text(entry.message)
-                                    .font(.system(size: 10, design: .monospaced))
-                                    .foregroundStyle(entry.level.color)
-                                    .textSelection(.enabled)
-                                Spacer()
-                            }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 2)
-                            .id(entry.id)
+                        ForEach(Array(appLog.entries.enumerated()), id: \.offset) { index, entry in
+                            Text(entry)
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundStyle(.primary)
+                                .textSelection(.enabled)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 2)
+                                .id(index)
                         }
                     }
                     .padding(.vertical, 4)
                 }
                 .background(Color.black.opacity(0.95))
-                .onChange(of: patchLogService.logs.count) { _ in
-                    if let lastLog = patchLogService.logs.last {
+                .onChange(of: appLog.entries.count) { count in
+                    if count > 0 {
                         withAnimation {
-                            proxy.scrollTo(lastLog.id, anchor: .bottom)
+                            proxy.scrollTo(count - 1, anchor: .bottom)
                         }
                     }
                 }

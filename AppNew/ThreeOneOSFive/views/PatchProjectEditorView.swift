@@ -146,17 +146,18 @@ struct PatchProjectEditorView: View {
                     Button(language.text("common.done"), action: save)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
+                    // Toggle verbose logging button
                     Button {
-                        DevicePatchService.isLoggingEnabled.toggle()
-                        if DevicePatchService.isLoggingEnabled {
-                            AppLog.shared.append("[3105] Patch logging enabled")
+                        PatchLogConfig.verboseEnabled.toggle()
+                        if PatchLogConfig.verboseEnabled {
+                            AppLog.shared.append("[3105] Verbose logging enabled")
                         } else {
-                            AppLog.shared.append("[3105] Patch logging disabled")
+                            AppLog.shared.append("[3105] Verbose logging disabled")
                         }
                     } label: {
-                        Image(systemName: DevicePatchService.isLoggingEnabled ? "terminal.fill" : "terminal")
+                        Image(systemName: PatchLogConfig.verboseEnabled ? "terminal.fill" : "terminal")
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(DevicePatchService.isLoggingEnabled ? AppTheme.neonCyan : .secondary)
+                            .foregroundStyle(PatchLogConfig.verboseEnabled ? AppTheme.neonCyan : .secondary)
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
