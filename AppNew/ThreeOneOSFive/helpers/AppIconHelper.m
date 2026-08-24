@@ -3,6 +3,19 @@
 #import <objc/message.h>
 #import <dlfcn.h>
 
+// MARK: - Logging Configuration
+// ═══════════════════════════════════════════════════════
+// Set IS_LOGGING_DISABLED = 1 to DISABLE all logs (release)
+// Set IS_LOGGING_DISABLED = 0 to ENABLE all logs (debug)
+// ═══════════════════════════════════════════════════════
+#define IS_LOGGING_DISABLED 0
+
+#if IS_LOGGING_DISABLED
+    #define LOG_DEBUG(...) do {} while(0)
+#else
+    #define LOG_DEBUG(...) NSLog(__VA_ARGS__)
+#endif
+
 static UIImage *iconFromData(NSData *data, CGFloat targetSize) {
     if (!data) return nil;
     UIImage *image = [UIImage imageWithData:data];
@@ -127,11 +140,11 @@ static void ensureLaunchServicesLoaded(void) {
         };
         for (size_t i = 0; i < sizeof(candidates) / sizeof(candidates[0]); i++) {
             if (dlopen(candidates[i], RTLD_LAZY | RTLD_GLOBAL)) {
-                NSLog(@"[3105] ls: loaded %s", candidates[i]);
+                LOG_DEBUG(@"[3105] ls: loaded %s", candidates[i]);
                 return;
             }
         }
-        NSLog(@"[3105] ls: CoreServices/MobileCoreServices dlopen failed");
+        LOG_DEBUG(@"[3105] ls: CoreServices/MobileCoreServices dlopen failed");
     });
 }
 
@@ -141,17 +154,17 @@ static NSDictionary *appsFromWorkspace(void) {
 
     Class workspaceClass = NSClassFromString(@"LSApplicationWorkspace");
     if (!workspaceClass) {
-        NSLog(@"[3105] ls: LSApplicationWorkspace class unavailable");
+        LOG_DEBUG(@"[3105] ls: LSApplicationWorkspace class unavailable");
         return result;
     }
     SEL defaultWorkspaceSel = NSSelectorFromString(@"defaultWorkspace");
     if (![workspaceClass respondsToSelector:defaultWorkspaceSel]) {
-        NSLog(@"[3105] ls: defaultWorkspace selector unavailable");
+        LOG_DEBUG(@"[3105] ls: defaultWorkspace selector unavailable");
         return result;
     }
     id workspace = ((id (*)(id, SEL))objc_msgSend)(workspaceClass, defaultWorkspaceSel);
     if (!workspace) {
-        NSLog(@"[3105] ls: defaultWorkspace returned nil");
+        LOG_DEBUG(@"[3105] ls: defaultWorkspace returned nil");
         return result;
     }
 
@@ -166,14 +179,14 @@ static NSDictionary *appsFromWorkspace(void) {
             usedSelector = selectorName;
             break;
         }
-        NSLog(@"[3105] ls: %@ returned %lu", selectorName,
+        LOG_DEBUG(@"[3105] ls: %@ returned %lu", selectorName,
               (unsigned long)([candidate isKindOfClass:[NSArray class]] ? [candidate count] : 0));
     }
     if (!apps || apps.count == 0) {
-        NSLog(@"[3105] ls: workspace enumeration empty");
+        LOG_DEBUG(@"[3105] ls: workspace enumeration empty");
         return result;
     }
-    NSLog(@"[3105] ls: %@ returned %lu proxies", usedSelector, (unsigned long)apps.count);
+    LOG_DEBUG(@"[3105] ls: %@ returned %lu proxies", usedSelector, (unsigned long)apps.count);
 
     NSUInteger withContainer = 0;
     for (id app in apps) {
@@ -218,7 +231,7 @@ static NSDictionary *appsFromWorkspace(void) {
             result[bundleID] = entry;
         }
     }
-    NSLog(@"[3105] ls: extracted %lu apps (%lu with container)",
+    LOG_DEBUG(@"[3105] ls: extracted %lu apps (%lu with container)",
           (unsigned long)result.count, (unsigned long)withContainer);
     return result;
 }
@@ -227,7 +240,7 @@ NSDictionary<NSString *, NSDictionary *> *installedAppInfo(void) {
     NSDictionary *workspace = appsFromWorkspace();
     if (workspace.count > 0) return workspace;
     NSDictionary *mobileInstallation = appsFromMobileInstallation();
-    NSLog(@"[3105] ls: workspace empty; MobileInstallation=%lu",
+    LOG_DEBUG(@"[3105] ls: workspace empty; MobileInstallation=%lu",
           (unsigned long)mobileInstallation.count);
     return mobileInstallation;
 }

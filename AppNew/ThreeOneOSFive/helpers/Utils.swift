@@ -3,15 +3,29 @@ import UIKit
 import Darwin
 import Combine
 
+// MARK: - Logging Configuration
+// ═══════════════════════════════════════════════════════
+// CHỈ CẦN ĐỔI DÒNG NÀY:
+//   false = LOGGING BẬT (debug/development)
+//   true  = LOGGING TẮT (release/production)
+// ═══════════════════════════════════════════════════════
+private let IS_LOGGING_DISABLED: Bool = false
+
 // MARK: - Global logger
 class AppLog: ObservableObject {
     static let shared = AppLog()
     @Published var entries: [String] = []
     func append(_ msg: String) {
-        DispatchQueue.main.async { self.entries.append(msg) }
+        if !IS_LOGGING_DISABLED {
+            DispatchQueue.main.async { self.entries.append(msg) }
+        }
     }
 }
-func log(_ msg: String) { AppLog.shared.append("[3105] \(msg)") }
+func log(_ msg: String) {
+    if !IS_LOGGING_DISABLED {
+        AppLog.shared.append("[3105] \(msg)")
+    }
+}
 
 // Retain the pipe for the app's lifetime so stdout/stderr stay redirected.
 private var logCapturePipe: Pipe?

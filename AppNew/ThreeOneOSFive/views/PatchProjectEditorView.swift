@@ -147,12 +147,7 @@ struct PatchProjectEditorView: View {
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
-                        DevicePatchService.isLoggingEnabled.toggle()
-                        if DevicePatchService.isLoggingEnabled {
-                            AppLog.shared.append("[3105] Patch logging enabled")
-                        } else {
-                            AppLog.shared.append("[3105] Patch logging disabled")
-                        }
+                        DevicePatchService.toggleLogging()
                     } label: {
                         Image(systemName: DevicePatchService.isLoggingEnabled ? "terminal.fill" : "terminal")
                             .font(.system(size: 14, weight: .semibold))

@@ -1,46 +1,41 @@
 import Foundation
 
-/// Compile-time flag to disable all patch logging in release builds
-/// Set to false to ENABLE logging (debug/development)
-/// Set to true to DISABLE logging (release/production)
-private let isLoggingDisabled: Bool = true
+// MARK: - Logging Configuration
+// ═══════════════════════════════════════════════════════
+// CHỈ CẦN ĐỔI DÒNG NÀY:
+//   false = LOGGING BẬT (debug/development)
+//   true  = LOGGING TẮT (release/production)
+// ═══════════════════════════════════════════════════════
+private let IS_LOGGING_DISABLED: Bool = false
 
 enum DevicePatchService {
-    /// Runtime toggle for verbose logging (only works when isLoggingDisabled = false)
+    /// Runtime toggle - only works when IS_LOGGING_DISABLED = false
     static var isLoggingEnabled: Bool = false
+
+    /// Toggle logging on/off at runtime
+    static func toggleLogging() {
+        isLoggingEnabled.toggle()
+    }
 
     @inline(__always)
     private static func log(_ message: String) {
-        #if PATCH_DISABLE_LOGGING
-        // Logs completely stripped in release builds
-        #else
-        if isLoggingDisabled { return }
-        if isLoggingEnabled {
+        if !IS_LOGGING_DISABLED && isLoggingEnabled {
             print("[PATCH] \(message)")
         }
-        #endif
     }
 
     @inline(__always)
     private static func logInfo(_ message: String) {
-        #if PATCH_DISABLE_LOGGING
-        // No-op
-        #else
-        if isLoggingDisabled { return }
-        if isLoggingEnabled {
+        if !IS_LOGGING_DISABLED && isLoggingEnabled {
             print("[PATCH] \(message)")
         }
-        #endif
     }
 
     @inline(__always)
     private static func logError(_ message: String) {
-        #if PATCH_DISABLE_LOGGING
-        // No-op
-        #else
-        if isLoggingDisabled { return }
-        print("[PATCH ERROR] \(message)")
-        #endif
+        if !IS_LOGGING_DISABLED {
+            print("[PATCH ERROR] \(message)")
+        }
     }
 
     static func apply(project: PatchProject) throws -> PatchTransactionReceipt {
