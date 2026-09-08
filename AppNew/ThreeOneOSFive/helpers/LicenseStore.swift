@@ -25,21 +25,67 @@ final class LicenseStore: ObservableObject {
     private let durationHoursKey = "license.durationHours"
     private let buildBlockedKey = "license.buildBlocked"
 
+    private static var cacheFileURL: URL? {
+        let fm = FileManager.default
+        if let libraryDir = fm.urls(for: .libraryDirectory, in: .userDomainMask).first {
+            let appSupport = libraryDir.appendingPathComponent("Application Support", isDirectory: true)
+            if !fm.fileExists(atPath: appSupport.path) {
+                try? fm.createDirectory(at: appSupport, withIntermediateDirectories: true)
+            }
+            return appSupport.appendingPathComponent(".license_key.cache")
+        }
+        return nil
+    }
+
+    /// Đọc key đã lưu từ UserDefaults hoặc file cache cục bộ trong app IPA
+    static func loadCachedKey() -> String? {
+        // 1. Đọc từ UserDefaults
+        if let key = UserDefaults.standard.string(forKey: "license.savedKey")?
+            .trimmingCharacters(in: .whitespacesAndNewlines), !key.isEmpty {
+            return key
+        }
+        // 2. Đọc từ file cache cục bộ (phòng khi UserDefaults bị reset trên iOS/sideload)
+        if let fileURL = cacheFileURL,
+           let data = try? Data(contentsOf: fileURL),
+           let key = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !key.isEmpty {
+            UserDefaults.standard.set(key, forKey: "license.savedKey")
+            return key
+        }
+        return nil
+    }
+
+    /// Lưu key bền vững vào cả UserDefaults và file cache cục bộ
+    static func persistCachedKey(_ key: String) {
+        UserDefaults.standard.set(key, forKey: "license.savedKey")
+        if let fileURL = cacheFileURL {
+            try? key.data(using: .utf8)?.write(to: fileURL, options: .atomic)
+        }
+    }
+
+    /// Xóa toàn bộ key khỏi UserDefaults và file cache
+    static func removeCachedKey() {
+        UserDefaults.standard.removeObject(forKey: "license.savedKey")
+        if let fileURL = cacheFileURL {
+            try? FileManager.default.removeItem(at: fileURL)
+        }
+    }
+
     private init() {
-        // Mỗi lần vào app đều bắt nhập lại: không đọc key từ UserDefaults khi
-        // khởi động. Key hợp lệ chỉ tồn tại trong RAM trong phiên hiện tại; bản
-        // lưu trên UserDefaults (nếu có) chỉ dùng để Logout/clear().
-        // Riêng thời gian (expiresAt) đọc từ cache để footer vẫn đếm ngược chuẩn
-        // thời gian còn lại thực của key, không bị reset khi user nhập lại key.
-        self.savedKey = nil
-        self.activatedAt = nil
-        self.durationDays = nil
-        self.durationHours = nil
         self.buildBlocked = UserDefaults.standard.bool(forKey: buildBlockedKey)
+
+        // Khôi phục key từ cache của app để mỗi lần vào app có thể tự động xác thực
+        self.savedKey = Self.loadCachedKey()
+
         if let stored = UserDefaults.standard.object(forKey: expiresKey) as? Double {
             self.expiresAt = Date(timeIntervalSince1970: stored)
         } else {
             self.expiresAt = nil
+        }
+        if let stored = UserDefaults.standard.object(forKey: activatedKey) as? Double {
+            self.activatedAt = Date(timeIntervalSince1970: stored)
+        } else {
+            self.activatedAt = nil
         }
         // Đọc duration từ cache để init() biết key ngắn hạn để render summary
         // "X giờ" chính xác ngay từ trước khi verifyKey chạy.
@@ -74,8 +120,8 @@ final class LicenseStore: ObservableObject {
     }
 
     func save(key: String, status: RemoteKeyStatus) {
+        Self.persistCachedKey(key)
         let d = UserDefaults.standard
-        d.set(key, forKey: keyDefaultsKey)
         var resolvedExpiresAt: Date?
         if let s = status.expiresAt, let date = Self.parseISO8601(s) {
             resolvedExpiresAt = date
@@ -151,8 +197,8 @@ final class LicenseStore: ObservableObject {
     }
 
     func clear() {
+        Self.removeCachedKey()
         let d = UserDefaults.standard
-        d.removeObject(forKey: keyDefaultsKey)
         d.removeObject(forKey: expiresKey)
         d.removeObject(forKey: activatedKey)
         d.removeObject(forKey: durationKey)

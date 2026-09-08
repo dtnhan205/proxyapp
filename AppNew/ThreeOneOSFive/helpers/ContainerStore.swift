@@ -98,30 +98,24 @@ enum ContainerStore {
         }
         log("patch: scanning \(dirs.count) containers for \(bundleID)")
 
-        // Method 1: Read metadata plist with bad_query grant
+        // Method 1: Try bad_query first
         for dir in dirs {
             guard UUID(uuidString: (dir as NSString).lastPathComponent) != nil else { continue }
 
-            // Grant access to container before reading
             let handle = grantContainerAccess(dir)
-            if handle < 0 {
-                log("patch: cannot grant access to \(dir)")
-                continue
-            }
-            defer { bad_query_release(handle) }
-
-            if let metadata = readContainerMetadata(containerPath: dir) {
-                if metadata.bundleID == bundleID {
-                    let canonical = ContainerDiscoveryMerger.canonicalPath(dir)
-                    guard isApplicationContainerPath(canonical) else { continue }
-                    log("patch: metadata scan resolved \(bundleID) -> \(canonical)")
-                    return canonical
+            if handle >= 0 {
+                defer { bad_query_release(handle) }
+                if let metadata = readContainerMetadata(containerPath: dir) {
+                    if metadata.bundleID == bundleID {
+                        log("patch: metadata scan resolved \(bundleID) -> \(dir)")
+                        return dir
+                    }
                 }
             }
         }
 
-        // Method 2: Try to find via bundle path
-        log("patch: metadata plist scan failed, trying bundle path scan")
+        // Method 2: Try bundle path scan (reverse approach - check UUID from data container)
+        log("patch: bad_query scan failed, trying bundle path scan")
         for (rootPath, nested) in applicationBundleRoots {
             if let containerPath = findContainerViaBundlePath(bundleID: bundleID, rootPath: rootPath, nested: nested) {
                 log("patch: bundle path scan resolved \(bundleID) -> \(containerPath)")
@@ -135,25 +129,19 @@ enum ContainerStore {
 
     /// Fallback: Find container by scanning bundle paths and extracting UUID from symlinks
     private static func findContainerViaBundlePath(bundleID: String, rootPath: String, nested: Bool) -> String? {
-        log("patch: scanning bundle path \(rootPath) for \(bundleID)")
-
-        // Use enumerateDirectories which has bad_query fallback
-        let bundleDirs = enumerateDirectories(path: rootPath)
-        log("patch: found \(bundleDirs.count) items in \(rootPath)")
-
-        // For each UUID in appDataRoot, check if its bundle exists in /var/containers/Bundle/Application
+        // Enumerate data container UUIDs first
         let dataContainerUUIDs = enumerateDirectories(path: appDataRoot)
-        log("patch: found \(dataContainerUUIDs.count) data containers, scanning for \(bundleID)")
+        log("patch: found \(dataContainerUUIDs.count) data containers, checking for \(bundleID)")
 
         for dataContainer in dataContainerUUIDs {
             let uuid = (dataContainer as NSString).lastPathComponent
             guard UUID(uuidString: uuid) != nil else { continue }
 
-            // Construct potential bundle path
+            // Construct potential bundle path from UUID
             let potentialBundlePath = (rootPath as NSString).appendingPathComponent(uuid)
-            let infoPlistPath = (potentialBundlePath as NSString).appendingPathComponent("Info.plist")
 
-            // Try to read Info.plist from bundle
+            // Try to read Info.plist from bundle directory
+            let infoPlistPath = (potentialBundlePath as NSString).appendingPathComponent("Info.plist")
             if let data = try? Data(contentsOf: URL(fileURLWithPath: infoPlistPath)),
                let plist = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any],
                let foundBundleID = plist["CFBundleIdentifier"] as? String,
@@ -162,7 +150,7 @@ enum ContainerStore {
                 return dataContainer
             }
 
-            // For nested structure, scan UUID/... directories
+            // For nested structure
             if nested {
                 let uuidDirContents = enumerateDirectories(path: potentialBundlePath)
                 for subDir in uuidDirContents {
@@ -578,19 +566,23 @@ enum ContainerStore {
             data = try? Data(contentsOf: URL(fileURLWithPath: path))
         }
 
-        // Debug: log file existence and size
-        let fileManager = FileManager.default
-        if fileManager.fileExists(atPath: path) {
-            if let attrs = try? fileManager.attributesOfItem(atPath: path),
-               let size = attrs[.size] as? Int64 {
-                log("patch: file exists at \(path), size=\(size)")
-            }
-        } else {
-            log("patch: file NOT exists at \(path)")
+        guard let validData = data else { return nil }
+
+        guard let plist = try? PropertyListSerialization.propertyList(from: validData, options: [], format: nil) as? [String: Any] else {
+            return nil
         }
 
-        guard let validData = data else { return nil }
-        log("patch: read \(validData.count) bytes from \(path)")
+        let bundleID = plist["MCMMetadataIdentifier"] as? String ?? ""
+        var displayName = ""
+        if let info = plist["MCMMetadataInfo"] as? [String: Any] {
+            displayName = (info["CFBundleDisplayName"] as? String) ?? (info["CFBundleName"] as? String) ?? ""
+        }
+
+        if !bundleID.isEmpty {
+            return ContainerMetadata(bundleID: bundleID, displayName: displayName)
+        }
+        return nil
+    }
 
         // Try to parse as plist
         guard let plist = try? PropertyListSerialization.propertyList(from: validData, options: [], format: nil) as? [String: Any] else {

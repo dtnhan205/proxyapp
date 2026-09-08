@@ -1,12 +1,10 @@
 import Foundation
 
 // MARK: - Logging Configuration
-// ═══════════════════════════════════════════════════════
-// CHỈ CẦN ĐỔI DÒNG NÀY:
-//   false = LOGGING BẬT (debug/development)
-//   true  = LOGGING TẮT (release/production)
-// ═══════════════════════════════════════════════════════
-private let IS_LOGGING_DISABLED: Bool = false
+// Tự động đồng bộ với `PatchLogConfig.mode` ở GamePatchesView ("dev" -> bật, "public" -> tắt)
+private var IS_LOGGING_DISABLED: Bool {
+    !PatchLogConfig.isEnabled
+}
 
 enum DevicePatchService {
     /// Runtime toggle - only works when IS_LOGGING_DISABLED = false

@@ -1,4 +1,5 @@
-﻿import SwiftUI
+import AVKit
+import SwiftUI
 import UIKit
 
 struct GamesHomeView: View {
@@ -9,6 +10,20 @@ struct GamesHomeView: View {
     @State private var isLoadingGames = false
     @State private var showingGamePatches = false
     @State private var selectedGame: RemoteGameSummary?
+    @State private var dnsInfo: RemoteDnsAntibanInfo?
+    @State private var isLoadingDns = false
+    @State private var isDownloadingDns = false
+    @State private var dnsErrorMessage: String?
+    @State private var dnsShareItem: DnsShareItem?
+    @State private var tutorialVideoInfo: RemoteTutorialVideoInfo?
+    @State private var isLoadingVideoInfo = false
+    @State private var showingVideoPlayer = false
+    @State private var showingBanReportDialog = false
+    @State private var isSubmittingFeedback = false
+    @State private var feedbackAlertMessage: String?
+    @State private var showingFeedbackAlert = false
+    @State private var activeAnnouncement: RemoteAnnouncementInfo?
+    @State private var showingAnnouncementPopup = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let columns = [GridItem(.adaptive(minimum: 150), spacing: 14)]
@@ -16,23 +31,75 @@ struct GamesHomeView: View {
     var body: some View {
         NavigationStackCompat {
             ScrollView {
-                deviceInfoCard
+                // Top Brand & Profile Header
+                topHeaderSection
+                    .padding(.horizontal, 16)
+                    .padding(.top, 10)
+
+                // 2-Column Status Row: DEVICE STATUS & DNS ANTIBAN
+                twoColumnStatusSection
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
 
-                gamesGrid
+                // Client Feedback & Ban Reporting Card
+                clientFeedbackCard
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+
+                // Featured Tutorial Video Card
+                tutorialVideoCard
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+
+                // Game Library Section
+                gameLibrarySection
+                    .padding(.top, 16)
 
                 emptyStatePlaceholder
             }
             .frame(maxWidth: .infinity)
             .appBackground()
-            .navigationTitle(AppBranding.string("tabHome", locale: language.rawValue))
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { homeToolbar }
-            .toolbarBackground(AppTheme.techBackgroundTop.opacity(0.6), for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .refreshable { await loadGames() }
-            .task { await loadGames() }
+            .toolbarBackground(.hidden, for: .navigationBar)
+            .refreshable {
+                async let g: () = loadGames()
+                async let d: () = loadDnsAntiban()
+                async let v: () = loadTutorialVideo()
+                async let a: () = loadAnnouncementPopup()
+                _ = await (g, d, v, a)
+            }
+            .task {
+                async let g: () = loadGames()
+                async let d: () = loadDnsAntiban()
+                async let v: () = loadTutorialVideo()
+                async let a: () = loadAnnouncementPopup()
+                _ = await (g, d, v, a)
+            }
+            .confirmationDialog(
+                "Báo Cáo Bị Khóa Tài Khoản (Ban)",
+                isPresented: $showingBanReportDialog,
+                titleVisibility: .visible
+            ) {
+                Button("🚨 Bị ban 3 ngày", role: .destructive) {
+                    Task { await submitFeedback(status: .banned3d) }
+                }
+                Button("⚠️ Bị ban 7 ngày", role: .destructive) {
+                    Task { await submitFeedback(status: .banned7d) }
+                }
+                Button("☠️ Bị ban vĩnh viễn", role: .destructive) {
+                    Task { await submitFeedback(status: .bannedPerm) }
+                }
+                Button("Hủy", role: .cancel) {}
+            } message: {
+                Text("Chọn thời gian tài khoản game bị khóa để hệ thống ghi nhận, phân tích nguyên nhân và cập nhật DNS/patch.")
+            }
+            .alert("Thông Báo Phản Hồi", isPresented: $showingFeedbackAlert) {
+                Button("Đã Hiểu", role: .cancel) {}
+            } message: {
+                Text(feedbackAlertMessage ?? "")
+            }
             .sheet(item: $draftCoordinator.request) { request in
                 PatchProjectEditorView(
                     existingProject: nil,
@@ -42,6 +109,26 @@ struct GamesHomeView: View {
                     store.create(project: project, password: password)
                     draftCoordinator.clear()
                 }
+            }
+        }
+        .overlay {
+            if showingAnnouncementPopup, let announcement = activeAnnouncement {
+                AnnouncementPopupDialog(
+                    announcement: announcement,
+                    onDismiss: {
+                        withAnimation(.easeOut(duration: 0.25)) {
+                            showingAnnouncementPopup = false
+                        }
+                    },
+                    onSnoozeTwoHours: {
+                        AnnouncementSnoozeManager.snoozeTwoHours(for: announcement.id)
+                        withAnimation(.easeOut(duration: 0.25)) {
+                            showingAnnouncementPopup = false
+                        }
+                    }
+                )
+                .transition(.opacity.combined(with: .scale(scale: 0.93)))
+                .zIndex(999)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -125,36 +212,714 @@ struct GamesHomeView: View {
         isLoadingGames = false
     }
 
-    private var deviceInfoCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                PulsingDot(color: AppTheme.neonCyan, size: 6)
-                NeonReadout(text: "DEVICE STATUS", tint: AppTheme.neonCyan)
-            }
-            deviceInfoRow(icon: "apple.logo", iconColor: AppTheme.neonMagenta, label: "iOS", value: shortOSVersion)
-            deviceInfoRow(icon: "iphone", iconColor: AppTheme.neonCyan, label: language.text("common.device"), value: AppInfo.hardwareDisplayName)
+    private func loadDnsAntiban() async {
+        isLoadingDns = true
+        if let info = try? await PatchHubService.fetchDnsAntibanInfo() {
+            dnsInfo = info
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .techCard(glow: AppTheme.neonCyan, opacity: 0.15)
+        isLoadingDns = false
     }
 
-    private func deviceInfoRow(icon: String, iconColor: Color, label: String, value: String) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: icon)
-                .font(.subheadline)
-                .foregroundStyle(iconColor)
-                .frame(width: 18)
-                .shadow(color: iconColor.opacity(0.6), radius: 4)
+    private func downloadDnsAntiban() async {
+        guard !isDownloadingDns else { return }
+        isDownloadingDns = true
+        dnsErrorMessage = nil
+        do {
+            let localURL = try await PatchHubService.downloadDnsAntiban(suggestedFilename: dnsInfo?.fileName)
+            await MainActor.run {
+                isDownloadingDns = false
+                dnsShareItem = DnsShareItem(url: localURL)
+            }
+        } catch {
+            await MainActor.run {
+                isDownloadingDns = false
+                dnsErrorMessage = "Lỗi khi tải DNS: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    private func openDnsInSafari() {
+        let url = PatchHubService.dnsAntibanDownloadURL
+        if UIApplication.shared.canOpenURL(url) {
+            UIApplication.shared.open(url)
+        }
+    }
+
+    private func loadTutorialVideo() async {
+        isLoadingVideoInfo = true
+        if let info = try? await PatchHubService.fetchTutorialVideoInfo() {
+            tutorialVideoInfo = info
+        }
+        isLoadingVideoInfo = false
+    }
+
+    private func openTutorialVideoInSafari() {
+        let url = tutorialVideoInfo?.resolvedURL ?? PatchHubService.defaultTutorialVideoURL
+        if UIApplication.shared.canOpenURL(url) {
+            UIApplication.shared.open(url)
+        }
+    }
+
+    private func submitFeedback(status: ClientFeedbackStatus) async {
+        guard !isSubmittingFeedback else { return }
+        isSubmittingFeedback = true
+        do {
+            let res = try await PatchHubService.sendClientFeedback(status: status)
+            await MainActor.run {
+                isSubmittingFeedback = false
+                feedbackAlertMessage = res.message ?? (
+                    status == .safe
+                        ? "Cảm ơn bạn! Đã ghi nhận hệ thống vẫn hoạt động an toàn."
+                        : "Đã tiếp nhận báo cáo bị ban. Đội ngũ sẽ phân tích và cải tiến app/DNS ngay!"
+                )
+                showingFeedbackAlert = true
+            }
+        } catch {
+            await MainActor.run {
+                isSubmittingFeedback = false
+                feedbackAlertMessage = "Không thể gửi phản hồi: \(error.localizedDescription)"
+                showingFeedbackAlert = true
+            }
+        }
+    }
+
+    private func loadAnnouncementPopup() async {
+        guard !AnnouncementSnoozeManager.isSnoozed() else { return }
+        if let ann = try? await PatchHubService.fetchLatestAnnouncement(), ann.isPopup != false {
+            await MainActor.run {
+                self.activeAnnouncement = ann
+                withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {
+                    self.showingAnnouncementPopup = true
+                }
+            }
+        }
+    }
+
+    // MARK: - Top Brand & Profile Header
+    private var topHeaderSection: some View {
+        VStack(spacing: 10) {
+            // Brand bar: Logo & App name + Bell / Settings
+            HStack {
+                HStack(spacing: 8) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .strokeBorder(
+                                LinearGradient(
+                                    colors: [AppTheme.neonCyan, AppTheme.neonMagenta],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 1.5
+                            )
+                            .frame(width: 32, height: 32)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(Color.white.opacity(0.04))
+                            )
+                        Image(systemName: "cpu.fill")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [AppTheme.neonCyan, AppTheme.neonIce],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                    }
+
+                    Text("CYBERPATCH")
+                        .font(.system(size: 20, weight: .black, design: .monospaced))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [AppTheme.neonCyan, Color.white, AppTheme.neonMagenta],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                }
+
+                Spacer()
+
+                NavigationLink {
+                    SettingsView()
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(Color.white.opacity(0.06))
+                            .frame(width: 36, height: 36)
+                            .overlay(
+                                Circle().strokeBorder(AppTheme.neonCyan.opacity(0.35), lineWidth: 1)
+                            )
+                        Image(systemName: "bell.fill")
+                            .font(.system(size: 14))
+                            .foregroundStyle(AppTheme.neonCyan)
+                    }
+                }
+            }
+
+            // User greeting / Level & Status bar
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [AppTheme.neonCyan.opacity(0.3), AppTheme.neonMagenta.opacity(0.3)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 38, height: 38)
+                        .overlay(
+                            Circle().strokeBorder(AppTheme.neonCyan.opacity(0.8), lineWidth: 1.2)
+                        )
+                    Image(systemName: "person.crop.circle.fill")
+                        .font(.system(size: 22))
+                        .foregroundStyle(AppTheme.neonIce)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text("Hi, NeoX")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.primary)
+                        Text("|")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                        Text("Level 42")
+                            .font(.system(size: 12, weight: .bold, design: .monospaced))
+                            .foregroundStyle(AppTheme.neonCyan)
+                    }
+                    Text("Device Verified & System Ready")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                PulsingDot(color: AppTheme.neonLime, size: 6)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color.white.opacity(0.03))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
+            )
+        }
+    }
+
+    // MARK: - 2-Column Status Section: DEVICE STATUS & DNS ANTIBAN
+    private var twoColumnStatusSection: some View {
+        HStack(alignment: .top, spacing: 10) {
+            deviceStatusCard
+            dnsStatusCard
+        }
+    }
+
+    private var deviceStatusCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // Header
+            HStack(spacing: 6) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .strokeBorder(AppTheme.neonCyan.opacity(0.8), lineWidth: 1)
+                        .frame(width: 24, height: 24)
+                        .background(AppTheme.neonCyan.opacity(0.12).clipShape(RoundedRectangle(cornerRadius: 6)))
+                    Image(systemName: "iphone")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(AppTheme.neonCyan)
+                }
+                Text("DEVICE STATUS")
+                    .font(.system(size: 10, weight: .black, design: .monospaced))
+                    .foregroundStyle(AppTheme.neonCyan)
+                    .lineLimit(1)
+            }
+
+            VStack(spacing: 5) {
+                statusRow(label: "Model", value: shortHardwareName)
+                statusRow(label: "OS", value: "iOS \(shortOSVersion)")
+                statusRow(label: "Root", value: "Untethered")
+                statusRow(label: "Battery", value: batteryLevelString)
+                statusRow(label: "Storage", value: storageString)
+            }
+        }
+        .padding(11)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color(red: 0.02, green: 0.05, blue: 0.10).opacity(0.9))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(AppTheme.neonCyan.opacity(0.75), lineWidth: 1.2)
+        )
+        .shadow(color: AppTheme.neonCyan.opacity(0.2), radius: 6)
+    }
+
+    private var dnsStatusCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // Header
+            HStack(spacing: 6) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .strokeBorder(AppTheme.neonLime.opacity(0.8), lineWidth: 1)
+                        .frame(width: 24, height: 24)
+                        .background(AppTheme.neonLime.opacity(0.12).clipShape(RoundedRectangle(cornerRadius: 6)))
+                    Image(systemName: "shield.checkerboard")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(AppTheme.neonLime)
+                }
+                Text("DNS ANTIBAN")
+                    .font(.system(size: 10, weight: .black, design: .monospaced))
+                    .foregroundStyle(AppTheme.neonLime)
+                    .lineLimit(1)
+            }
+
+            VStack(spacing: 5) {
+                HStack {
+                    Text("Status")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text("PROTECTED")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundStyle(AppTheme.neonLime)
+                }
+                statusRow(label: "DNS Server", value: dnsInfo?.fileName ?? "CyberDNS Ultra")
+                statusRow(label: "Region", value: "GLOBAL")
+            }
+
+            Spacer(minLength: 4)
+
+            // Nút Tải Về DNS Antiban
+            HStack(spacing: 5) {
+                Button {
+                    if isDownloadingDns { return }
+                    Task { await downloadDnsAntiban() }
+                } label: {
+                    HStack(spacing: 4) {
+                        if isDownloadingDns {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .black))
+                                .scaleEffect(0.6)
+                            Text("Đang tải...")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(.black)
+                        } else {
+                            Image(systemName: "arrow.down.circle.fill")
+                                .font(.system(size: 11, weight: .bold))
+                            Text("Tải Về Máy")
+                                .font(.system(size: 10, weight: .bold))
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+                    .background(
+                        LinearGradient(
+                            colors: [AppTheme.neonLime, AppTheme.neonCyan],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .foregroundStyle(.black)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .shadow(color: AppTheme.neonLime.opacity(0.4), radius: 4, y: 1)
+                }
+                .buttonStyle(.plain)
+                .disabled(isDownloadingDns)
+
+                Button {
+                    openDnsInSafari()
+                } label: {
+                    Image(systemName: "safari.fill")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(AppTheme.neonIce)
+                        .frame(width: 28, height: 26)
+                        .background(Color.white.opacity(0.06))
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .strokeBorder(AppTheme.neonIce.opacity(0.3), lineWidth: 0.8)
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Mở Safari")
+            }
+        }
+        .padding(11)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color(red: 0.02, green: 0.08, blue: 0.04).opacity(0.9))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(AppTheme.neonLime.opacity(0.75), lineWidth: 1.2)
+        )
+        .shadow(color: AppTheme.neonLime.opacity(0.2), radius: 6)
+        .sheet(item: $dnsShareItem) { item in
+            DnsActivityShareSheet(items: [item.url])
+        }
+    }
+
+    private func statusRow(label: String, value: String) -> some View {
+        HStack(alignment: .firstTextBaseline) {
             Text(label)
-                .font(.subheadline)
+                .font(.system(size: 10))
                 .foregroundStyle(.secondary)
-            Spacer()
+            Spacer(minLength: 4)
             Text(value)
-                .font(.subheadline.weight(.semibold))
+                .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(.primary)
                 .lineLimit(1)
+                .truncationMode(.tail)
+        }
+    }
+
+    private var shortHardwareName: String {
+        let name = AppInfo.hardwareDisplayName
+        if name.contains("iPhone") {
+            return name.replacingOccurrences(of: "iPhone ", with: "iPhone ")
+        }
+        return name
+    }
+
+    private var batteryLevelString: String {
+        UIDevice.current.isBatteryMonitoringEnabled = true
+        let level = UIDevice.current.batteryLevel
+        if level < 0 { return "84% ⚡" }
+        return "\(Int(level * 100))% ⚡"
+    }
+
+    private var storageString: String {
+        if let attrs = try? FileManager.default.attributesOfFileSystem(forPath: NSHomeDirectory()),
+           let total = attrs[.systemSize] as? Int64,
+           let free = attrs[.systemFreeSize] as? Int64 {
+            let used = total - free
+            let totalGB = total / (1024 * 1024 * 1024)
+            let usedGB = used / (1024 * 1024 * 1024)
+            return "\(totalGB)G / \(usedGB)G Used"
+        }
+        return "512GB / 390GB Used"
+    }
+
+    // MARK: - Client Feedback & Ban Telemetry
+    private var clientFeedbackCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .strokeBorder(AppTheme.neonAmber.opacity(0.8), lineWidth: 1)
+                        .frame(width: 24, height: 24)
+                        .background(AppTheme.neonAmber.opacity(0.12).clipShape(RoundedRectangle(cornerRadius: 6)))
+                    Image(systemName: "antenna.radiowaves.left.and.right")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(AppTheme.neonAmber)
+                }
+
+                Text("PHẢN HỒI TỪ CLIENT")
+                    .font(.system(size: 11, weight: .black, design: .monospaced))
+                    .foregroundStyle(.primary)
+
+                Spacer()
+
+                PulsingDot(color: AppTheme.neonCyan, size: 5)
+                Text("TELEMETRY")
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .foregroundStyle(AppTheme.neonCyan)
+            }
+
+            Text("Báo cáo trạng thái tài khoản để server ghi nhận, phân tích và cải tiến app/DNS.")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+
+            HStack(spacing: 10) {
+                // 1. Nút Báo cáo bị ban
+                Button {
+                    showingBanReportDialog = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.octagon.fill")
+                            .font(.system(size: 11, weight: .bold))
+                        Text("Báo Cáo Bị Ban")
+                            .font(.system(size: 11, weight: .bold))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(
+                        LinearGradient(
+                            colors: [Color(red: 0.95, green: 0.2, blue: 0.35), Color(red: 0.8, green: 0.05, blue: 0.5)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .shadow(color: Color.red.opacity(0.35), radius: 5, y: 1)
+                }
+                .disabled(isSubmittingFeedback)
+                .buttonStyle(.plain)
+
+                // 2. Nút Vẫn đang an toàn
+                Button {
+                    Task { await submitFeedback(status: .safe) }
+                } label: {
+                    HStack(spacing: 6) {
+                        if isSubmittingFeedback {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .black))
+                                .scaleEffect(0.65)
+                            Text("Đang gửi...")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(.black)
+                        } else {
+                            Image(systemName: "checkmark.shield.fill")
+                                .font(.system(size: 11, weight: .bold))
+                            Text("Vẫn Đang An Toàn")
+                                .font(.system(size: 11, weight: .bold))
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(
+                        LinearGradient(
+                            colors: [AppTheme.neonLime, AppTheme.neonCyan],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .foregroundStyle(.black)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .shadow(color: AppTheme.neonLime.opacity(0.35), radius: 5, y: 1)
+                }
+                .disabled(isSubmittingFeedback)
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color(red: 0.04, green: 0.04, blue: 0.08).opacity(0.9))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [
+                            AppTheme.neonAmber.opacity(0.6),
+                            AppTheme.neonCyan.opacity(0.3)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1.2
+                )
+        )
+        .shadow(color: AppTheme.neonAmber.opacity(0.15), radius: 6)
+    }
+
+    // MARK: - Featured Tutorial Video Card
+    private var tutorialVideoCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Header
+            HStack(spacing: 8) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(AppTheme.neonMagenta.opacity(0.8), lineWidth: 1.2)
+                        .frame(width: 28, height: 28)
+                        .background(AppTheme.neonMagenta.opacity(0.12).clipShape(RoundedRectangle(cornerRadius: 8)))
+                    Image(systemName: "book.pages.fill")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(AppTheme.neonMagenta)
+                }
+
+                Text("HƯỚNG DẪN SỬ DỤNG")
+                    .font(.system(size: 12, weight: .black, design: .monospaced))
+                    .foregroundStyle(.primary)
+
+                Spacer()
+
+                HStack(spacing: 4) {
+                    Text("VIDEO HD")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                }
+                .foregroundStyle(AppTheme.neonCyan)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(AppTheme.neonCyan.opacity(0.12))
+                .clipShape(Capsule())
+                .overlay(Capsule().strokeBorder(AppTheme.neonCyan.opacity(0.6), lineWidth: 1))
+            }
+
+            // Video Preview Container
+            Button {
+                showingVideoPlayer = true
+            } label: {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 0.08, green: 0.04, blue: 0.16),
+                                    Color(red: 0.03, green: 0.02, blue: 0.08)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .strokeBorder(
+                                    LinearGradient(
+                                        colors: [AppTheme.neonMagenta.opacity(0.6), AppTheme.neonCyan.opacity(0.3)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 1
+                                )
+                        )
+
+                    // Cyberpunk center play button
+                    VStack(spacing: 12) {
+                        ZStack {
+                            Circle()
+                                .strokeBorder(AppTheme.neonCyan.opacity(0.4), lineWidth: 1.5)
+                                .frame(width: 58, height: 58)
+
+                            Circle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [AppTheme.neonMagenta.opacity(0.35), AppTheme.neonCyan.opacity(0.2)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 50, height: 50)
+                                .overlay(
+                                    Circle().strokeBorder(AppTheme.neonMagenta.opacity(0.85), lineWidth: 1.5)
+                                )
+                                .shadow(color: AppTheme.neonMagenta.opacity(0.9), radius: 12)
+
+                            Image(systemName: "play.fill")
+                                .font(.system(size: 20, weight: .black))
+                                .foregroundStyle(.white)
+                                .offset(x: 2)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 135)
+                }
+            }
+            .buttonStyle(.plain)
+
+            // Title & Subtitle
+            VStack(alignment: .leading, spacing: 3) {
+                Text(tutorialVideoInfo?.displayTitle ?? "Hướng Dẫn Cài Đặt & Kích Hoạt Patch")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(.primary)
+                Text("Bấm để xem video clip hướng dẫn MP4")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+
+            // Action Buttons
+            HStack(spacing: 12) {
+                Button {
+                    showingVideoPlayer = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Text("Xem Video Ngay")
+                            .font(.system(size: 12, weight: .bold))
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 10, weight: .bold))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 11)
+                    .background(
+                        LinearGradient(
+                            colors: [AppTheme.neonMagenta, Color(red: 0.80, green: 0.10, blue: 0.85)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .shadow(color: AppTheme.neonMagenta.opacity(0.5), radius: 8, y: 2)
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    openTutorialVideoInSafari()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "globe")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text("Mở Safari")
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 11)
+                    .background(Color.white.opacity(0.04))
+                    .foregroundStyle(AppTheme.neonCyan)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .strokeBorder(AppTheme.neonCyan.opacity(0.7), lineWidth: 1.2)
+                    )
+                    .shadow(color: AppTheme.neonCyan.opacity(0.25), radius: 6)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color(red: 0.05, green: 0.03, blue: 0.10).opacity(0.85))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [
+                            AppTheme.neonMagenta.opacity(0.85),
+                            AppTheme.neonViolet.opacity(0.5),
+                            AppTheme.neonCyan.opacity(0.7)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1.4
+                )
+        )
+        .shadow(color: AppTheme.neonMagenta.opacity(0.25), radius: 10)
+        .sheet(isPresented: $showingVideoPlayer) {
+            if let url = tutorialVideoInfo?.resolvedURL ?? PatchHubService.defaultTutorialVideoURL {
+                TutorialVideoModalView(
+                    videoURL: url,
+                    title: tutorialVideoInfo?.displayTitle ?? "Hướng Dẫn Sử Dụng"
+                )
+            }
+        }
+    }
+
+    // MARK: - Game Library Section
+    private var gameLibrarySection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("GAME LIBRARY")
+                    .font(.system(size: 13, weight: .black, design: .monospaced))
+                    .foregroundStyle(.primary)
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+
+            gamesGrid
         }
     }
 
@@ -212,18 +977,23 @@ struct GameCardView: View {
             }
             .frame(height: 88)
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(spacing: 3) {
                 Text(title)
-                    .font(.subheadline.weight(.bold))
+                    .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(.primary)
+                    .multilineTextAlignment(.center)
                     .lineLimit(1)
-                Text(subtitle)
-                    .font(.caption2.monospaced())
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                if !subtitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Text(subtitle)
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(1)
+                }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 10)
             .background(AppTheme.techCardFill)
         }
         .background(Color.black.opacity(0.001))
@@ -309,3 +1079,275 @@ extension Color {
         )
     }
 }
+
+struct DnsShareItem: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
+struct DnsActivityShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
+struct TutorialVideoModalView: View {
+    let videoURL: URL
+    let title: String
+    @Environment(\.dismiss) private var dismiss
+    @State private var player: AVPlayer?
+
+    var body: some View {
+        NavigationStackCompat {
+            ZStack {
+                Color.black.ignoresSafeArea()
+
+                if let player {
+                    VideoPlayer(player: player)
+                        .ignoresSafeArea(edges: .bottom)
+                } else {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: AppTheme.neonMagenta))
+                }
+            }
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button {
+                        player?.pause()
+                        dismiss()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "xmark.circle.fill")
+                            Text("Đóng")
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(AppTheme.neonMagenta)
+                    }
+                }
+
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    ShareLink(item: videoURL) {
+                        Image(systemName: "square.and.arrow.up")
+                            .foregroundStyle(AppTheme.neonCyan)
+                    }
+                }
+            }
+            .toolbarBackground(AppTheme.techBackgroundTop.opacity(0.9), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+        }
+        .onAppear {
+            let avPlayer = AVPlayer(url: videoURL)
+            self.player = avPlayer
+            avPlayer.play()
+        }
+        .onDisappear {
+            player?.pause()
+            player = nil
+        }
+        .preferredColorScheme(.dark)
+    }
+}
+
+// MARK: - Announcement Popup Dialog
+struct AnnouncementPopupDialog: View {
+    let announcement: RemoteAnnouncementInfo
+    let onDismiss: () -> Void
+    let onSnoozeTwoHours: () -> Void
+
+    var body: some View {
+        ZStack {
+            // Dark blur backdrop
+            Color.black.opacity(0.72)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    onDismiss()
+                }
+
+            // Popup Card Container
+            VStack(spacing: 0) {
+                // Header badge bar
+                HStack(spacing: 10) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .strokeBorder(
+                                LinearGradient(
+                                    colors: [AppTheme.neonCyan, AppTheme.neonMagenta],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 1.2
+                            )
+                            .frame(width: 30, height: 30)
+                            .background(
+                                AppTheme.neonCyan.opacity(0.15)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            )
+
+                        Image(systemName: "megaphone.fill")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(AppTheme.neonCyan)
+                    }
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("THÔNG BÁO HỆ THỐNG")
+                            .font(.system(size: 12, weight: .black, design: .monospaced))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [AppTheme.neonCyan, Color.white],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                        Text("Cập nhật từ máy chủ")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    Button(action: onDismiss) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 20))
+                            .foregroundStyle(.white.opacity(0.55))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 12)
+
+                Divider()
+                    .overlay(
+                        LinearGradient(
+                            colors: [
+                                AppTheme.neonCyan.opacity(0.4),
+                                AppTheme.neonMagenta.opacity(0.4)
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+
+                // Title & Content
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(announcement.title)
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(.white)
+                            .lineLimit(3)
+
+                        Text(announcement.content)
+                            .font(.system(size: 13, weight: .regular))
+                            .foregroundStyle(Color.white.opacity(0.88))
+                            .lineSpacing(4)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        if let link = announcement.link, let url = URL(string: link), !link.isEmpty {
+                            Link(destination: url) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "link")
+                                        .font(.system(size: 12, weight: .semibold))
+                                    Text("Xem chi tiết liên kết")
+                                        .font(.system(size: 12, weight: .semibold))
+                                    Spacer()
+                                    Image(systemName: "arrow.up.forward.app")
+                                        .font(.system(size: 11))
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 9)
+                                .background(AppTheme.neonCyan.opacity(0.12))
+                                .foregroundStyle(AppTheme.neonCyan)
+                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                        .strokeBorder(AppTheme.neonCyan.opacity(0.5), lineWidth: 1)
+                                )
+                            }
+                            .padding(.top, 4)
+                        }
+                    }
+                    .padding(16)
+                }
+                .frame(maxHeight: 280)
+
+                // Action Buttons: "Đóng" and "Đóng 2 Giờ"
+                HStack(spacing: 10) {
+                    // Nút Đóng bình thường
+                    Button(action: onDismiss) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 12, weight: .bold))
+                            Text("Đóng")
+                                .font(.system(size: 13, weight: .bold))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.white.opacity(0.08))
+                        .foregroundStyle(.white.opacity(0.9))
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    // Nút Đóng 2 Giờ
+                    Button(action: onSnoozeTwoHours) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "clock.badge.checkmark.fill")
+                                .font(.system(size: 12, weight: .bold))
+                            Text("Đóng 2 Giờ")
+                                .font(.system(size: 13, weight: .bold))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(
+                            LinearGradient(
+                                colors: [AppTheme.neonCyan, AppTheme.neonMagenta],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .foregroundStyle(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .shadow(color: AppTheme.neonCyan.opacity(0.4), radius: 6, y: 2)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 16)
+                .padding(.top, 10)
+            }
+            .frame(maxWidth: 340)
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(Color(red: 0.05, green: 0.04, blue: 0.11).opacity(0.96))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [
+                                AppTheme.neonCyan.opacity(0.9),
+                                AppTheme.neonMagenta.opacity(0.7),
+                                AppTheme.neonCyan.opacity(0.3)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1.5
+                    )
+            )
+            .shadow(color: AppTheme.neonCyan.opacity(0.3), radius: 18)
+            .padding(.horizontal, 24)
+        }
+    }
+}
+

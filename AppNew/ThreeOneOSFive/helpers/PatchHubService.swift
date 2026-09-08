@@ -87,9 +87,118 @@ enum LicenseKeyError: Error, LocalizedError {
     }
 }
 
-enum PatchHubError: Error {
+struct RemoteDnsAntibanInfo: Decodable, Equatable {
+    let available: Bool
+    let fileName: String?
+    let sizeBytes: Int64?
+    let uploadedAt: String?
+
+    var formattedSize: String {
+        guard let sizeBytes, sizeBytes > 0 else { return "—" }
+        return ByteCountFormatter.string(fromByteCount: sizeBytes, countStyle: .file)
+    }
+}
+
+struct RemoteTutorialVideoInfo: Decodable, Equatable {
+    let available: Bool
+    let type: String?
+    let videoUrl: String?
+    let title: String?
+    let fileName: String?
+    let sizeBytes: Int64?
+    let mimeType: String?
+    let uploadedAt: String?
+    let updatedAt: String?
+
+    var displayTitle: String {
+        if let title, !title.isEmpty { return title }
+        return "Video Hướng Dẫn Sử Dụng"
+    }
+
+    var formattedSize: String? {
+        guard let sizeBytes, sizeBytes > 0 else { return nil }
+        return ByteCountFormatter.string(fromByteCount: sizeBytes, countStyle: .file)
+    }
+
+    /// URL đầy đủ để phát video MP4 (hỗ trợ cả link ngoài CDN/Drive và route local từ server)
+    var resolvedURL: URL? {
+        guard available else { return nil }
+        if let raw = videoUrl?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty {
+            if raw.hasPrefix("http://") || raw.hasPrefix("https://") {
+                return URL(string: raw)
+            }
+            let clean = raw.hasPrefix("/") ? String(raw.dropFirst()) : raw
+            return PatchHubService.baseURL.appendingPathComponent(clean)
+        }
+        return PatchHubService.defaultTutorialVideoURL
+    }
+}
+
+enum ClientFeedbackStatus: String {
+    case safe = "safe"
+    case banned3d = "banned_3d"
+    case banned7d = "banned_7d"
+    case bannedPerm = "banned_perm"
+
+    var displayText: String {
+        switch self {
+        case .safe: return "An Toàn"
+        case .banned3d: return "Bị Ban 3 Ngày"
+        case .banned7d: return "Bị Ban 7 Ngày"
+        case .bannedPerm: return "Bị Ban Vĩnh Viễn"
+        }
+    }
+}
+
+struct ClientFeedbackResponse: Decodable, Equatable {
+    let ok: Bool
+    let message: String?
+    let reportId: String?
+}
+
+struct RemoteAnnouncementInfo: Decodable, Equatable, Identifiable {
+    let id: String
+    let title: String
+    let content: String
+    let type: String?
+    let link: String?
+    let isPopup: Bool?
+    let enabled: Bool?
+    let createdAt: String?
+}
+
+enum AnnouncementSnoozeManager {
+    private static let snoozeUntilKey = "announcement_snooze_until_timestamp"
+    private static let lastSnoozedIdKey = "announcement_last_snoozed_id"
+
+    static func isSnoozed() -> Bool {
+        let until = UserDefaults.standard.double(forKey: snoozeUntilKey)
+        guard until > 0 else { return false }
+        let now = Date().timeIntervalSince1970
+        return now < until
+    }
+
+    static func snoozeTwoHours(for id: String? = nil) {
+        let twoHoursLater = Date().addingTimeInterval(2 * 3600).timeIntervalSince1970
+        UserDefaults.standard.set(twoHoursLater, forKey: snoozeUntilKey)
+        if let id {
+            UserDefaults.standard.set(id, forKey: lastSnoozedIdKey)
+        }
+    }
+}
+
+enum PatchHubError: Error, LocalizedError {
     case invalidResponse
     case checksumMismatch
+    case fileUnavailable
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidResponse: return "Phản hồi từ máy chủ không hợp lệ"
+        case .checksumMismatch: return "Tệp tải về bị lỗi kiểm tra toàn vẹn"
+        case .fileUnavailable: return "Máy chủ chưa có tệp DNS Antiban"
+        }
+    }
 }
 
 enum PatchHubService {
@@ -113,6 +222,98 @@ enum PatchHubService {
         let host = Obfuscated.decode(baseURLBytes, key: baseURLKey)
         return URL(string: host)!
     }()
+
+    static var dnsAntibanDownloadURL: URL {
+        baseURL.appendingPathComponent("api/dns-antiban")
+    }
+
+    static var defaultTutorialVideoURL: URL {
+        baseURL.appendingPathComponent("api/tutorial-video")
+    }
+
+    static func fetchTutorialVideoInfo() async throws -> RemoteTutorialVideoInfo {
+        let url = baseURL.appendingPathComponent("api/tutorial-video/info")
+        let (data, response) = try await URLSession.shared.data(from: url)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw PatchHubError.invalidResponse
+        }
+        return try JSONDecoder().decode(RemoteTutorialVideoInfo.self, from: data)
+    }
+
+    static func fetchDnsAntibanInfo() async throws -> RemoteDnsAntibanInfo {
+        let url = baseURL.appendingPathComponent("api/dns-antiban/info")
+        let (data, response) = try await URLSession.shared.data(from: url)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw PatchHubError.invalidResponse
+        }
+        return try JSONDecoder().decode(RemoteDnsAntibanInfo.self, from: data)
+    }
+
+    static func downloadDnsAntiban(suggestedFilename: String? = nil) async throws -> URL {
+        let url = dnsAntibanDownloadURL
+        let (tempURL, response) = try await URLSession.shared.download(from: url)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            try? FileManager.default.removeItem(at: tempURL)
+            throw PatchHubError.invalidResponse
+        }
+        let fallbackName = (response as? HTTPURLResponse)?.suggestedFilename ?? "dns-antiban.mobileconfig"
+        let rawName = suggestedFilename?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let filename = (rawName?.isEmpty == false) ? rawName! : fallbackName
+
+        let downloadsDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("dns_downloads", isDirectory: true)
+        if !FileManager.default.fileExists(atPath: downloadsDir.path) {
+            try FileManager.default.createDirectory(at: downloadsDir, withIntermediateDirectories: true)
+        }
+        let destination = downloadsDir.appendingPathComponent(filename)
+        try? FileManager.default.removeItem(at: destination)
+        try FileManager.default.moveItem(at: tempURL, to: destination)
+        return destination
+    }
+
+    static func sendClientFeedback(
+        status: ClientFeedbackStatus,
+        gameId: String? = nil,
+        gameName: String? = nil,
+        note: String? = nil
+    ) async throws -> ClientFeedbackResponse {
+        let url = baseURL.appendingPathComponent("api/feedback/report")
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.timeoutInterval = 10
+        let body: [String: Any] = [
+            "status": status.rawValue,
+            "deviceId": DeviceIdentity.serial(),
+            "appVersion": AppInfo.osVersion,
+            "gameId": gameId ?? "",
+            "gameName": gameName ?? "",
+            "note": note ?? ""
+        ]
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await URLSession.shared.data(for: req)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw PatchHubError.invalidResponse
+        }
+        return try JSONDecoder().decode(ClientFeedbackResponse.self, from: data)
+    }
+
+    static func fetchLatestAnnouncement() async throws -> RemoteAnnouncementInfo? {
+        let url = baseURL.appendingPathComponent("api/announcements/latest")
+        let (data, response) = try await URLSession.shared.data(from: url)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw PatchHubError.invalidResponse
+        }
+        struct Envelope: Decodable {
+            let available: Bool
+            let announcement: RemoteAnnouncementInfo?
+        }
+        let decoded = try JSONDecoder().decode(Envelope.self, from: data)
+        guard decoded.available, let item = decoded.announcement, item.enabled != false else {
+            return nil
+        }
+        return item
+    }
 
     static func fetchGames() async throws -> [RemoteGameSummary] {
         let url = baseURL.appendingPathComponent("api/games")

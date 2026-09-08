@@ -145,22 +145,24 @@ struct PatchProjectEditorView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(language.text("common.done"), action: save)
                 }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        DevicePatchService.toggleLogging()
-                    } label: {
-                        Image(systemName: DevicePatchService.isLoggingEnabled ? "terminal.fill" : "terminal")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(DevicePatchService.isLoggingEnabled ? AppTheme.neonCyan : .secondary)
+                if PatchLogConfig.isEnabled {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button {
+                            DevicePatchService.toggleLogging()
+                        } label: {
+                            Image(systemName: DevicePatchService.isLoggingEnabled ? "terminal.fill" : "terminal")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(DevicePatchService.isLoggingEnabled ? AppTheme.neonCyan : .secondary)
+                        }
                     }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        showPatchLog.toggle()
-                    } label: {
-                        Image(systemName: showPatchLog ? "list.bullet.rectangle.portrait.fill" : "list.bullet.rectangle.portrait")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(showPatchLog ? AppTheme.neonMagenta : .secondary)
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button {
+                            showPatchLog.toggle()
+                        } label: {
+                            Image(systemName: showPatchLog ? "list.bullet.rectangle.portrait.fill" : "list.bullet.rectangle.portrait")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(showPatchLog ? AppTheme.neonMagenta : .secondary)
+                        }
                     }
                 }
             }
@@ -176,7 +178,7 @@ struct PatchProjectEditorView: View {
             .scrollContentBackground(.hidden)
             .appBackground()
             .overlay(alignment: .bottom) {
-                if showPatchLog {
+                if PatchLogConfig.isEnabled && showPatchLog {
                     patchLogOverlay
                         .transition(.opacity.combined(with: .move(edge: .bottom)))
                 }

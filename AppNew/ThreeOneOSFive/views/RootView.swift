@@ -27,7 +27,10 @@ struct RootView: View {
                 ContentView()
                     .environmentObject(store)
                     .transition(.opacity)
-            case .needsKey, .checking:
+            case .checking:
+                checkingView
+                    .transition(.opacity)
+            case .needsKey:
                 LicenseGateView(onUnlock: {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         gateDecision = .unlocked
@@ -69,24 +72,86 @@ struct RootView: View {
         }
     }
 
+    private var checkingView: some View {
+        ZStack {
+            AppTheme.techBackgroundTop
+                .ignoresSafeArea()
+
+            VStack(spacing: 24) {
+                ZStack {
+                    Circle()
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 0.0, green: 0.94, blue: 1.0),
+                                    Color(red: 1.0, green: 0.0, blue: 0.83)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 2
+                        )
+                        .frame(width: 88, height: 88)
+
+                    Image(systemName: "key.fill")
+                        .font(.system(size: 34, weight: .semibold))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 0.0, green: 0.94, blue: 1.0),
+                                    Color(red: 1.0, green: 0.0, blue: 0.83)
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .shadow(color: Color(red: 0.0, green: 0.94, blue: 1.0).opacity(0.8), radius: 10)
+                }
+
+                VStack(spacing: 8) {
+                    HStack(spacing: 6) {
+                        PulsingDot(color: AppTheme.neonCyan, size: 6)
+                        NeonReadout(text: "AUTH VERIFICATION", tint: AppTheme.neonCyan)
+                    }
+
+                    Text("Đang xác thực license key...")
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+
+                    Text("Kiểm tra key từ bộ nhớ đệm với máy chủ")
+                        .font(.system(size: 12, weight: .regular, design: .monospaced))
+                        .foregroundColor(Color(white: 0.6))
+                }
+
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: AppTheme.neonCyan))
+                    .scaleEffect(1.1)
+                    .padding(.top, 4)
+            }
+            .padding(32)
+        }
+    }
+
     private func evaluate() async {
         guard let key = store.savedKey, !key.isEmpty else {
-            await MainActor.run { gateDecision = .needsKey }
+            await MainActor.run {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    gateDecision = .needsKey
+                }
+            }
             return
         }
         do {
             let serial = DeviceIdentity.serial()
-            _ = try await PatchHubService.verifyKey(key: key, deviceSerial: serial)
+            let status = try await PatchHubService.verifyKey(key: key, deviceSerial: serial)
             await MainActor.run {
-                // Verify OK → build token hợp lệ. Clear block flag nếu có
-                // (phòng khi user build cũ đã bị block, build mới add token
-                // mới → sau khi verify thành công sẽ tự gỡ overlay).
+                // Verify OK → build token hợp lệ. Clear block flag nếu có.
                 store.setBuildBlocked(false)
-                // Verify OK → RAM chưa có expiresAt vì init() không đọc cache.
-                // Khôi phục từ UserDefaults để footer đếm ngược thời gian còn lại
-                // thực của key, không reset về 0.
-                store.restoreSession()
-                gateDecision = .unlocked
+                // Cập nhật lại key và status mới nhất từ server vào cache
+                store.save(key: key, status: status)
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    gateDecision = .unlocked
+                }
             }
         } catch let error as LicenseKeyError {
             // Build bị revoke / unknown → bật overlay và KHÔNG clear key.
@@ -95,22 +160,28 @@ struct RootView: View {
             case .buildRevoked, .buildUnknown, .buildMissing:
                 await MainActor.run {
                     store.setBuildBlocked(true)
-                    gateDecision = .needsKey
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        gateDecision = .needsKey
+                    }
                 }
                 return
             default:
                 break
             }
-            // Verify fail (key bình thường) — xoá key local, đẩy về gate.
+            // Verify fail (key hết hạn, bị thu hồi, sai thiết bị...) — xoá key local trong cache, đẩy về gate để nhập key mới.
             await MainActor.run {
                 store.clear()
-                gateDecision = .needsKey
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    gateDecision = .needsKey
+                }
             }
         } catch {
-            // Verify fail — xoá key local, đẩy về gate.
+            // Verify fail (lỗi kết nối hoặc lỗi server) — xoá key local, đẩy về gate.
             await MainActor.run {
                 store.clear()
-                gateDecision = .needsKey
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    gateDecision = .needsKey
+                }
             }
         }
     }

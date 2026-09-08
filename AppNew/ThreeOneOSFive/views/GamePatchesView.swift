@@ -1,5 +1,21 @@
 import SwiftUI
 
+// MARK: - ⚙️ CẤU HÌNH HIỂN THỊ LOG PATCH KHI BUILD IPA (DEV / PUBLIC)
+// ═══════════════════════════════════════════════════════════════════════════════
+// Đổi giá trị biến `mode` dưới đây:
+//
+//   • "dev"    : Hiển thị log patch, các nút log trên thanh công cụ và tự bung popup log khi lỗi (Dùng để phân tích & sửa lỗi)
+//   • "public" : Ẩn hoàn toàn phần log patch và toàn bộ giao diện UI log khỏi app
+// ═══════════════════════════════════════════════════════════════════════════════
+enum PatchLogConfig {
+    static let mode: String = "dev" // <--- ĐỔI TẠI ĐÂY: "dev" HOẶC "public"
+
+    /// Kiểm tra xem chế độ log có đang được bật hay không
+    static var isEnabled: Bool {
+        mode.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "dev"
+    }
+}
+
 struct GamePatchesView: View {
     @Environment(\.appLanguage) private var language
     let game: RemoteGameSummary
@@ -12,8 +28,6 @@ struct GamePatchesView: View {
     @State private var showKeySheet = false
     @State private var keyBannerVisible = true
     @State private var showPatchLog = false
-    @State private var showEntryNotice: Bool = false
-    @AppStorage("patch.gameEntryNoticeDismissed") private var entryNoticeDismissed: Bool = false
     @AppStorage("patch.importedOnlineIDs") private var importedOnlineIDsRaw = ""
     @AppStorage("patch.gameAssignments") private var gameAssignmentsRaw = "{}"
     @AppStorage("patch.remoteToLocalMap") private var remoteToLocalMapRaw = "{}"
@@ -56,7 +70,7 @@ struct GamePatchesView: View {
             }
 
             // Patch log overlay
-            if showPatchLog {
+            if PatchLogConfig.isEnabled && showPatchLog {
                 patchLogOverlay
             }
         }
@@ -73,21 +87,23 @@ struct GamePatchesView: View {
                             NeonReadout(text: "SYNC", tint: AppTheme.neonCyan)
                         }
                     }
-                    // Toggle logging button
-                    Button {
-                        DevicePatchService.toggleLogging()
-                    } label: {
-                        Image(systemName: DevicePatchService.isLoggingEnabled ? "terminal.fill" : "terminal")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(DevicePatchService.isLoggingEnabled ? AppTheme.neonCyan : .secondary)
-                    }
-                    // Show log panel button
-                    Button {
-                        showPatchLog.toggle()
-                    } label: {
-                        Image(systemName: showPatchLog ? "list.bullet.rectangle.portrait.fill" : "list.bullet.rectangle.portrait")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(showPatchLog ? AppTheme.neonMagenta : .secondary)
+                    if PatchLogConfig.isEnabled {
+                        // Toggle logging button
+                        Button {
+                            DevicePatchService.toggleLogging()
+                        } label: {
+                            Image(systemName: DevicePatchService.isLoggingEnabled ? "terminal.fill" : "terminal")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(DevicePatchService.isLoggingEnabled ? AppTheme.neonCyan : .secondary)
+                        }
+                        // Show log panel button
+                        Button {
+                            showPatchLog.toggle()
+                        } label: {
+                            Image(systemName: showPatchLog ? "list.bullet.rectangle.portrait.fill" : "list.bullet.rectangle.portrait")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(showPatchLog ? AppTheme.neonMagenta : .secondary)
+                        }
                     }
                 }
             }
@@ -103,38 +119,7 @@ struct GamePatchesView: View {
             if !hasValidKey {
                 showKeySheet = true
             }
-            // Lần đầu vào game (chưa từng bấm "Không hiển thị lại") → show lưu ý
-            // về Định vị + Aim. Dùng Task ngắn để alert có thời gian mount.
-            if !entryNoticeDismissed {
-                Task { @MainActor in
-                    try? await Task.sleep(nanoseconds: 250_000_000)
-                    showEntryNotice = true
-                }
-            }
         }
-        // Custom modal thay cho native alert — match cyberpunk theme + tách 2 bước.
-        .overlay {
-            if showEntryNotice {
-                GameEntryNoticeModal(
-                    title: language.text("patch.game_entry_notice_title"),
-                    subtitle: language.text("patch.game_entry_notice_subtitle"),
-                    step1Label: language.text("patch.game_entry_notice_step1_label"),
-                    step1Desc: language.text("patch.game_entry_notice_step1_desc"),
-                    step2Label: language.text("patch.game_entry_notice_step2_label"),
-                    step2Desc: language.text("patch.game_entry_notice_step2_desc"),
-                    confirmTitle: language.text("patch.game_entry_notice_confirm"),
-                    dismissTitle: language.text("patch.game_entry_notice_dismiss"),
-                    onConfirm: { showEntryNotice = false },
-                    onDismiss: {
-                        entryNoticeDismissed = true
-                        showEntryNotice = false
-                    }
-                )
-                .transition(.opacity.combined(with: .scale(scale: 0.96)))
-                .zIndex(100)
-            }
-        }
-        .animation(.spring(response: 0.32, dampingFraction: 0.85), value: showEntryNotice)
         .alert(item: $store.alert) { alert in
             Alert(
                 title: Text(language.text(alert.titleKey)),
@@ -535,8 +520,8 @@ struct GamePatchesView: View {
                     let key = isOn ? "patch.toggle_on_success" : "patch.toggle_off_success"
                     toast = ToastMessage(text: language.text(key, name))
                 }
-                // Show log on failure
-                if capturedFailure != nil {
+                // Show log on failure (chỉ tự động hiện khi mode = "dev")
+                if capturedFailure != nil && PatchLogConfig.isEnabled {
                     showPatchLog = true
                 }
             }
@@ -618,238 +603,5 @@ struct GamePatchesView: View {
         .shadow(color: AppTheme.neonMagenta.opacity(0.3), radius: 10)
         .padding(.horizontal, 8)
         .padding(.bottom, 8)
-    }
-}
-
-// MARK: - Game Entry Notice Modal
-
-/// Modal "Trước khi vào game" hiển thị khi user mở 1 game lần đầu.
-/// Thay thế native `.alert` để match cyberpunk theme + tách rõ 2 bước
-/// (Định vị → Aim) bằng icon + màu riêng.
-private struct GameEntryNoticeModal: View {
-    let title: String
-    let subtitle: String
-    let step1Label: String
-    let step1Desc: String
-    let step2Label: String
-    let step2Desc: String
-    let confirmTitle: String
-    let dismissTitle: String
-    let onConfirm: () -> Void
-    let onDismiss: () -> Void
-
-    var body: some View {
-        ZStack {
-            // Backdrop mờ — không dùng .ultraThinMaterial để tránh GPU cost
-            Color.black.opacity(0.55)
-                .ignoresSafeArea()
-
-            // Card chính
-            VStack(spacing: 0) {
-                header
-                Divider()
-                    .overlay(AppTheme.neonCyan.opacity(0.18))
-                stepsSection
-                Divider()
-                    .overlay(AppTheme.neonCyan.opacity(0.18))
-                footer
-            }
-            .background(cardBackground)
-            .overlay(cardBorder)
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .shadow(color: AppTheme.neonCyan.opacity(0.35), radius: 24, y: 0)
-            .shadow(color: .black.opacity(0.45), radius: 18, y: 8)
-            .padding(.horizontal, 22)
-        }
-        .onTapGesture { /* nuốt tap để không lan ra ngoài */ }
-    }
-
-    // MARK: Header
-
-    private var header: some View {
-        VStack(spacing: 10) {
-            ZStack {
-                // Vòng glow phía sau icon — static, không animation
-                Circle()
-                    .fill(
-                        RadialGradient(
-                            colors: [
-                                AppTheme.neonCyan.opacity(0.35),
-                                AppTheme.neonCyan.opacity(0.0),
-                            ],
-                            center: .center,
-                            startRadius: 8,
-                            endRadius: 36
-                        )
-                    )
-                    .frame(width: 72, height: 72)
-
-                Image(systemName: "exclamationmark.shield.fill")
-                    .font(.system(size: 30, weight: .bold))
-                    .foregroundStyle(AppTheme.neonCyan)
-                    .shadow(color: AppTheme.neonCyan.opacity(0.7), radius: 6)
-            }
-
-            Text(title)
-                .font(.title3.weight(.bold))
-                .foregroundStyle(.primary)
-                .multilineTextAlignment(.center)
-
-            Text(subtitle)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-        }
-        .padding(.top, 22)
-        .padding(.bottom, 16)
-        .padding(.horizontal, 20)
-        .frame(maxWidth: .infinity)
-    }
-
-    // MARK: Steps
-
-    private var stepsSection: some View {
-        VStack(spacing: 10) {
-            stepRow(
-                index: 1,
-                icon: "location.fill",
-                iconColor: AppTheme.neonCyan,
-                label: step1Label,
-                desc: step1Desc
-            )
-            stepRow(
-                index: 2,
-                icon: "scope",
-                iconColor: AppTheme.neonMagenta,
-                label: step2Label,
-                desc: step2Desc
-            )
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 16)
-    }
-
-    private func stepRow(
-        index: Int,
-        icon: String,
-        iconColor: Color,
-        label: String,
-        desc: String
-    ) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            // Icon chip với số thứ tự nhỏ ở góc
-            ZStack(alignment: .topTrailing) {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(iconColor.opacity(0.14))
-                    .frame(width: 44, height: 44)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .strokeBorder(iconColor.opacity(0.45), lineWidth: 1)
-                    )
-                Image(systemName: icon)
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(iconColor)
-                    .shadow(color: iconColor.opacity(0.55), radius: 4)
-
-                Text("\(index)")
-                    .font(.system(size: 10, weight: .heavy))
-                    .foregroundStyle(.black)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 1)
-                    .background(iconColor, in: Capsule())
-                    .offset(x: 6, y: -4)
-            }
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(label)
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(.primary)
-                Text(desc)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(10)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color.white.opacity(0.03))
-        )
-    }
-
-    // MARK: Footer
-
-    private var footer: some View {
-        VStack(spacing: 8) {
-            Button(action: onConfirm) {
-                HStack(spacing: 6) {
-                    Image(systemName: "checkmark")
-                        .font(.footnote.weight(.bold))
-                    Text(confirmTitle)
-                        .font(.subheadline.weight(.bold))
-                }
-                .foregroundStyle(.black)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(
-                    LinearGradient(
-                        colors: [AppTheme.neonCyan, AppTheme.neonIce],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    ),
-                    in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-                )
-                .shadow(color: AppTheme.neonCyan.opacity(0.45), radius: 10, y: 4)
-            }
-            .buttonStyle(.plain)
-
-            Button(action: onDismiss) {
-                Text(dismissTitle)
-                    .font(.footnote.weight(.medium))
-                    .foregroundStyle(.secondary)
-                    .padding(.vertical, 6)
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(.horizontal, 16)
-        .padding(.top, 14)
-        .padding(.bottom, 18)
-    }
-
-    // MARK: Card background & border
-
-    private var cardBackground: some View {
-        ZStack {
-            // Base dark fill
-            Color(red: 0.06, green: 0.09, blue: 0.14)
-            // Subtle top-down gradient cho chiều sâu
-            LinearGradient(
-                colors: [
-                    AppTheme.neonCyan.opacity(0.10),
-                    .clear,
-                    AppTheme.neonMagenta.opacity(0.06),
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        }
-    }
-
-    private var cardBorder: some View {
-        RoundedRectangle(cornerRadius: 22, style: .continuous)
-            .strokeBorder(
-                LinearGradient(
-                    colors: [
-                        AppTheme.neonCyan.opacity(0.7),
-                        AppTheme.neonCyan.opacity(0.25),
-                        AppTheme.neonMagenta.opacity(0.55),
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                ),
-                lineWidth: 1.2
-            )
     }
 }
