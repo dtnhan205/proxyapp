@@ -32,7 +32,7 @@ enum IntegrityChecker {
     /// Khi token này bị admin revoke (hoặc không tồn tại trên server) →
     /// mọi thiết bị đang dùng token sẽ bị phủ overlay "Đã có phiên bản
     /// mới" full-screen, persist qua UserDefaults.
-    static let buildToken: String = "TN4UQLEGQ5L2D2ZD9EX9P89H"
+    static let buildToken: String = "Q426XMVNZ8LY5HS5GSPA3ZM9"
 
     /// Bundle identifier hiện tại, gửi kèm request để server đối chiếu.
     static let bundleIdentifier: String = Bundle.main.bundleIdentifier ?? expectedBundleID

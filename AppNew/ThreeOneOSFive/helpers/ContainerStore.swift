@@ -584,27 +584,6 @@ enum ContainerStore {
         return nil
     }
 
-        // Try to parse as plist
-        guard let plist = try? PropertyListSerialization.propertyList(from: validData, options: [], format: nil) as? [String: Any] else {
-            // Try XML format
-            if let xmlString = String(data: validData, encoding: .utf8) {
-                log("patch: raw content (first 200 chars): \(String(xmlString.prefix(200)))")
-            }
-            return nil
-        }
-
-        let bundleID = plist["MCMMetadataIdentifier"] as? String ?? ""
-        var displayName = ""
-        if let info = plist["MCMMetadataInfo"] as? [String: Any] {
-            displayName = (info["CFBundleDisplayName"] as? String) ?? (info["CFBundleName"] as? String) ?? ""
-        }
-
-        if !bundleID.isEmpty {
-            return ContainerMetadata(bundleID: bundleID, displayName: displayName)
-        }
-        return nil
-    }
-
     private static func extractBundleIDFromContainer(_ containerPath: String) -> String? {
         // Try Info.plist in the bundle directory
         let infoPlistPath = (containerPath as NSString).appendingPathComponent("Info.plist")

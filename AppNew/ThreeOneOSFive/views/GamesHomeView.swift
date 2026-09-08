@@ -899,12 +899,10 @@ struct GamesHomeView: View {
         )
         .shadow(color: AppTheme.neonMagenta.opacity(0.25), radius: 10)
         .sheet(isPresented: $showingVideoPlayer) {
-            if let url = tutorialVideoInfo?.resolvedURL ?? PatchHubService.defaultTutorialVideoURL {
-                TutorialVideoModalView(
-                    videoURL: url,
-                    title: tutorialVideoInfo?.displayTitle ?? "Hướng Dẫn Sử Dụng"
-                )
-            }
+            TutorialVideoModalView(
+                videoURL: tutorialVideoInfo?.resolvedURL ?? PatchHubService.defaultTutorialVideoURL,
+                title: tutorialVideoInfo?.displayTitle ?? "Hướng Dẫn Sử Dụng"
+            )
         }
     }
 
