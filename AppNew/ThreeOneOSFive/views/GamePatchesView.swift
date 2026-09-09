@@ -18,6 +18,7 @@ enum PatchLogConfig {
 
 struct GamePatchesView: View {
     @Environment(\.appLanguage) private var language
+    @EnvironmentObject private var appState: AppState
     let game: RemoteGameSummary
     @ObservedObject var store: PatchProjectStore
 
@@ -462,6 +463,17 @@ struct GamePatchesView: View {
         guard hasValidKey else {
             toast = ToastMessage(text: "Vui lòng nhập key để sử dụng")
             showKeySheet = true
+            return
+        }
+
+        if appState.kernelExploitRunning {
+            toast = ToastMessage(text: "Hệ thống đang kích hoạt quyền truy cập, vui lòng đợi giây lát...")
+            return
+        }
+
+        if appState.kernelExploitApplicable && !appState.exploitStatus.isSuccess && !appState.exploitStatus.isFailed {
+            appState.runKernelExploitIfNeeded()
+            toast = ToastMessage(text: "Đang kích hoạt quyền hệ thống, vui lòng thử lại...")
             return
         }
 

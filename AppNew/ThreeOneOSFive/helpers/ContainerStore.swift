@@ -111,6 +111,14 @@ enum ContainerStore {
                         return dir
                     }
                 }
+            } else if !shouldUseBadQuery {
+                // iOS < 26 (iOS 18.x): bad_query không áp dụng, đọc metadata trực tiếp khi đã escape sandbox
+                if let metadata = readContainerMetadata(containerPath: dir) {
+                    if metadata.bundleID == bundleID {
+                        log("patch: metadata scan resolved \(bundleID) -> \(dir)")
+                        return dir
+                    }
+                }
             }
         }
 
