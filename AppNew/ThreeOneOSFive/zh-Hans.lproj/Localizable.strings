@@ -525,3 +525,52 @@
 "wallpaper.error.install" = "安装失败，本次尝试添加的描述符已回滚。";
 "wallpaper.error.restore" = "3105 无法安全移除此安装中的全部描述符。";
 "wallpaper.error.unknown" = "发生意外错误。请查看会话日志了解详情。";
+
+/* Home - Device Status */
+"home.status.title" = "设备状态";
+"home.status.model" = "型号";
+"home.status.os" = "系统";
+"home.status.root" = "Root权限";
+"home.status.untethered" = "Untethered";
+"home.status.battery" = "电池";
+"home.status.storage" = "存储";
+"home.status.storage_used" = "已用 %lldGB / %lldGB";
+
+/* Home - DNS Antiban */
+"home.dns.title" = "DNS 防封";
+"home.dns.status" = "状态";
+"home.dns.protected" = "已保护";
+"home.dns.server" = "DNS服务器";
+"home.dns.region" = "区域";
+"home.dns.global" = "全球";
+"home.dns.download" = "下载配置文件";
+"home.dns.open_safari" = "在Safari中打开";
+
+/* Home - Client Feedback */
+"home.feedback.title" = "客户端反馈";
+"home.feedback.today_count" = "今日：%lld/2";
+"home.feedback.description" = "报告账号状态以供服务器遥测和DNS分析（每台设备/Key每日最多2次）。";
+"home.feedback.report_ban" = "报告封号";
+"home.feedback.still_safe" = "仍安全";
+"home.feedback.sending" = "发送中...";
+"home.feedback.dialog_title" = "报告账号被封禁";
+"home.feedback.dialog_message" = "选择游戏账号被封时间以协助我们分析原因并更新DNS/补丁。";
+"home.feedback.banned_3d" = "🚨 被封禁 3 天";
+"home.feedback.banned_7d" = "⚠️ 被封禁 7 天";
+"home.feedback.banned_perm" = "☠️ 永久封禁";
+"home.feedback.alert_title" = "反馈通知";
+"home.feedback.alert_dismiss" = "明白了";
+"home.feedback.safe_success" = "感谢！已确认系统运行安全。";
+"home.feedback.ban_success" = "已接收封号报告。团队将尽快分析并更新应用/DNS！";
+"home.feedback.remaining_note" = "\n\n（今日剩余 %lld/2 次提交）";
+"home.feedback.limit_reached" = "您今天已达到2次反馈上限（每台设备/Key每日最多2次）。请明天再来！";
+"home.feedback.error" = "发送反馈失败：%@";
+
+/* Home - Tutorial Video */
+"home.tutorial.title" = "使用教程";
+"home.tutorial.badge" = "高清视频";
+"home.tutorial.default_title" = "补丁安装与激活教程";
+"home.tutorial.subtitle" = "点击观看 MP4 教程视频";
+"home.tutorial.watch_now" = "立即观看视频";
+"home.tutorial.open_safari" = "在Safari中打开";
+"home.tutorial.modal_title" = "使用教程";

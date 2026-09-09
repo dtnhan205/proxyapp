@@ -533,3 +533,52 @@
 "wallpaper.error.install" = "Installation failed and any descriptors added during this attempt were rolled back.";
 "wallpaper.error.restore" = "3105 could not safely remove every descriptor from this installation.";
 "wallpaper.error.unknown" = "An unexpected error occurred. Review Session Logs for details.";
+
+/* Home - Device Status */
+"home.status.title" = "DEVICE STATUS";
+"home.status.model" = "Model";
+"home.status.os" = "OS";
+"home.status.root" = "Root";
+"home.status.untethered" = "Untethered";
+"home.status.battery" = "Battery";
+"home.status.storage" = "Storage";
+"home.status.storage_used" = "%lldGB / %lldGB Used";
+
+/* Home - DNS Antiban */
+"home.dns.title" = "DNS ANTIBAN";
+"home.dns.status" = "Status";
+"home.dns.protected" = "PROTECTED";
+"home.dns.server" = "DNS Server";
+"home.dns.region" = "Region";
+"home.dns.global" = "GLOBAL";
+"home.dns.download" = "Download Profile";
+"home.dns.open_safari" = "Open Safari";
+
+/* Home - Client Feedback */
+"home.feedback.title" = "CLIENT FEEDBACK";
+"home.feedback.today_count" = "TODAY: %lld/2";
+"home.feedback.description" = "Report account status for server telemetry and DNS analysis (max 2 times/day per device & key).";
+"home.feedback.report_ban" = "Report Ban";
+"home.feedback.still_safe" = "Still Safe";
+"home.feedback.sending" = "Sending...";
+"home.feedback.dialog_title" = "Report Account Ban";
+"home.feedback.dialog_message" = "Select the ban duration to help us analyze the cause and update DNS/patches.";
+"home.feedback.banned_3d" = "🚨 Banned for 3 days";
+"home.feedback.banned_7d" = "⚠️ Banned for 7 days";
+"home.feedback.banned_perm" = "☠️ Permanently banned";
+"home.feedback.alert_title" = "Feedback Notification";
+"home.feedback.alert_dismiss" = "Got It";
+"home.feedback.safe_success" = "Thank you! Confirmed the system is operating safely.";
+"home.feedback.ban_success" = "Ban report received. The team will analyze and update app/DNS shortly!";
+"home.feedback.remaining_note" = "\n\n(%lld/2 submissions remaining today)";
+"home.feedback.limit_reached" = "You have reached the daily limit of 2 feedbacks today (max 2/day per device & key). Please return tomorrow!";
+"home.feedback.error" = "Failed to send feedback: %@";
+
+/* Home - Tutorial Video */
+"home.tutorial.title" = "USER GUIDE";
+"home.tutorial.badge" = "HD VIDEO";
+"home.tutorial.default_title" = "Patch Installation & Activation Guide";
+"home.tutorial.subtitle" = "Tap to watch MP4 tutorial video";
+"home.tutorial.watch_now" = "Watch Video Now";
+"home.tutorial.open_safari" = "Open Safari";
+"home.tutorial.modal_title" = "User Guide";

@@ -115,6 +115,11 @@ struct RemoteTutorialVideoInfo: Decodable, Equatable {
         return "Video Hướng Dẫn Sử Dụng"
     }
 
+    func displayTitle(language: AppLanguage) -> String {
+        if let title, !title.isEmpty { return title }
+        return language.text("home.tutorial.modal_title")
+    }
+
     var formattedSize: String? {
         guard let sizeBytes, sizeBytes > 0 else { return nil }
         return ByteCountFormatter.string(fromByteCount: sizeBytes, countStyle: .file)
@@ -146,6 +151,15 @@ enum ClientFeedbackStatus: String {
         case .banned3d: return "Bị Ban 3 Ngày"
         case .banned7d: return "Bị Ban 7 Ngày"
         case .bannedPerm: return "Bị Ban Vĩnh Viễn"
+        }
+    }
+
+    func displayText(language: AppLanguage) -> String {
+        switch self {
+        case .safe: return language.text("home.feedback.still_safe")
+        case .banned3d: return language.text("home.feedback.banned_3d")
+        case .banned7d: return language.text("home.feedback.banned_7d")
+        case .bannedPerm: return language.text("home.feedback.banned_perm")
         }
     }
 }

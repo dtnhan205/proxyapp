@@ -8,7 +8,7 @@ import SwiftUI
 //   • "public" : Ẩn hoàn toàn phần log patch và toàn bộ giao diện UI log khỏi app
 // ═══════════════════════════════════════════════════════════════════════════════
 enum PatchLogConfig {
-    static let mode: String = "dev" // <--- ĐỔI TẠI ĐÂY: "dev" HOẶC "public"
+    static let mode: String = "public" // <--- ĐỔI TẠI ĐÂY: "dev" HOẶC "public"
 
     /// Kiểm tra xem chế độ log có đang được bật hay không
     static var isEnabled: Bool {

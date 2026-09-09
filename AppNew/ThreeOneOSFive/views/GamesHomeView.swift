@@ -77,25 +77,25 @@ struct GamesHomeView: View {
                 _ = await (g, d, v, a)
             }
             .confirmationDialog(
-                "Báo Cáo Bị Khóa Tài Khoản (Ban)",
+                language.text("home.feedback.dialog_title"),
                 isPresented: $showingBanReportDialog,
                 titleVisibility: .visible
             ) {
-                Button("🚨 Bị ban 3 ngày", role: .destructive) {
+                Button(language.text("home.feedback.banned_3d"), role: .destructive) {
                     Task { await submitFeedback(status: .banned3d) }
                 }
-                Button("⚠️ Bị ban 7 ngày", role: .destructive) {
+                Button(language.text("home.feedback.banned_7d"), role: .destructive) {
                     Task { await submitFeedback(status: .banned7d) }
                 }
-                Button("☠️ Bị ban vĩnh viễn", role: .destructive) {
+                Button(language.text("home.feedback.banned_perm"), role: .destructive) {
                     Task { await submitFeedback(status: .bannedPerm) }
                 }
-                Button("Hủy", role: .cancel) {}
+                Button(language.text("common.cancel"), role: .cancel) {}
             } message: {
-                Text("Chọn thời gian tài khoản game bị khóa để hệ thống ghi nhận, phân tích nguyên nhân và cập nhật DNS/patch.")
+                Text(language.text("home.feedback.dialog_message"))
             }
-            .alert("Thông Báo Phản Hồi", isPresented: $showingFeedbackAlert) {
-                Button("Đã Hiểu", role: .cancel) {}
+            .alert(language.text("home.feedback.alert_title"), isPresented: $showingFeedbackAlert) {
+                Button(language.text("home.feedback.alert_dismiss"), role: .cancel) {}
             } message: {
                 Text(feedbackAlertMessage ?? "")
             }
@@ -255,7 +255,7 @@ struct GamesHomeView: View {
         guard !isSubmittingFeedback else { return }
         guard ClientFeedbackLimitManager.canSubmit() else {
             await MainActor.run {
-                feedbackAlertMessage = "Bạn đã gửi phản hồi tối đa 2 lần trong ngày hôm nay (mỗi máy/mỗi key tối đa 2 lần/ngày). Vui lòng quay lại vào ngày mai!"
+                feedbackAlertMessage = language.text("home.feedback.limit_reached")
                 showingFeedbackAlert = true
             }
             return
@@ -268,16 +268,17 @@ struct GamesHomeView: View {
             await MainActor.run {
                 isSubmittingFeedback = false
                 let defaultMsg = status == .safe
-                    ? "Cảm ơn bạn! Đã ghi nhận hệ thống vẫn hoạt động an toàn."
-                    : "Đã tiếp nhận báo cáo bị ban. Đội ngũ sẽ phân tích và cải tiến app/DNS ngay!"
+                    ? language.text("home.feedback.safe_success")
+                    : language.text("home.feedback.ban_success")
                 let serverMsg = res.message ?? defaultMsg
-                feedbackAlertMessage = "\(serverMsg)\n\n(Hôm nay còn lại \(remaining)/2 lượt gửi)"
+                let note = language.text("home.feedback.remaining_note", remaining)
+                feedbackAlertMessage = "\(serverMsg)\(note)"
                 showingFeedbackAlert = true
             }
         } catch {
             await MainActor.run {
                 isSubmittingFeedback = false
-                feedbackAlertMessage = "Không thể gửi phản hồi: \(error.localizedDescription)"
+                feedbackAlertMessage = language.text("home.feedback.error", error.localizedDescription)
                 showingFeedbackAlert = true
             }
         }
@@ -434,18 +435,18 @@ struct GamesHomeView: View {
                         .font(.system(size: 11, weight: .bold))
                         .foregroundStyle(AppTheme.neonCyan)
                 }
-                Text("DEVICE STATUS")
+                Text(language.text("home.status.title"))
                     .font(.system(size: 10, weight: .black, design: .monospaced))
                     .foregroundStyle(AppTheme.neonCyan)
                     .lineLimit(1)
             }
 
             VStack(spacing: 5) {
-                statusRow(label: "Model", value: shortHardwareName)
-                statusRow(label: "OS", value: "iOS \(shortOSVersion)")
-                statusRow(label: "Root", value: "Untethered")
-                statusRow(label: "Battery", value: batteryLevelString)
-                statusRow(label: "Storage", value: storageString)
+                statusRow(label: language.text("home.status.model"), value: shortHardwareName)
+                statusRow(label: language.text("home.status.os"), value: "iOS \(shortOSVersion)")
+                statusRow(label: language.text("home.status.root"), value: language.text("home.status.untethered"))
+                statusRow(label: language.text("home.status.battery"), value: batteryLevelString)
+                statusRow(label: language.text("home.status.storage"), value: storageString)
             }
         }
         .padding(11)
@@ -474,7 +475,7 @@ struct GamesHomeView: View {
                         .font(.system(size: 11, weight: .bold))
                         .foregroundStyle(AppTheme.neonLime)
                 }
-                Text("DNS ANTIBAN")
+                Text(language.text("home.dns.title"))
                     .font(.system(size: 10, weight: .black, design: .monospaced))
                     .foregroundStyle(AppTheme.neonLime)
                     .lineLimit(1)
@@ -482,16 +483,16 @@ struct GamesHomeView: View {
 
             VStack(spacing: 5) {
                 HStack {
-                    Text("Status")
+                    Text(language.text("home.dns.status"))
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                     Spacer()
-                    Text("PROTECTED")
+                    Text(language.text("home.dns.protected"))
                         .font(.system(size: 10, weight: .bold, design: .monospaced))
                         .foregroundStyle(AppTheme.neonLime)
                 }
-                statusRow(label: "DNS Server", value: dnsInfo?.fileName ?? "CyberDNS Ultra")
-                statusRow(label: "Region", value: "GLOBAL")
+                statusRow(label: language.text("home.dns.server"), value: dnsInfo?.fileName ?? "CyberDNS Ultra")
+                statusRow(label: language.text("home.dns.region"), value: language.text("home.dns.global"))
             }
 
             Spacer(minLength: 4)
@@ -504,7 +505,7 @@ struct GamesHomeView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "arrow.down.circle.fill")
                             .font(.system(size: 11, weight: .bold))
-                        Text("Tải Về Máy")
+                        Text(language.text("home.dns.download"))
                             .font(.system(size: 10, weight: .bold))
                     }
                     .frame(maxWidth: .infinity)
@@ -537,7 +538,7 @@ struct GamesHomeView: View {
                         )
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Mở Safari")
+                .accessibilityLabel(language.text("home.dns.open_safari"))
             }
         }
         .padding(11)
@@ -593,9 +594,9 @@ struct GamesHomeView: View {
             let used = total - free
             let totalGB = total / (1024 * 1024 * 1024)
             let usedGB = used / (1024 * 1024 * 1024)
-            return "\(totalGB)G / \(usedGB)G Used"
+            return language.text("home.status.storage_used", totalGB, usedGB)
         }
-        return "512GB / 390GB Used"
+        return language.text("home.status.storage_used", 512, 390)
     }
 
     // MARK: - Client Feedback & Ban Telemetry
@@ -612,7 +613,7 @@ struct GamesHomeView: View {
                         .foregroundStyle(AppTheme.neonAmber)
                 }
 
-                Text("PHẢN HỒI TỪ CLIENT")
+                Text(language.text("home.feedback.title"))
                     .font(.system(size: 11, weight: .black, design: .monospaced))
                     .foregroundStyle(.primary)
 
@@ -620,13 +621,13 @@ struct GamesHomeView: View {
 
                 HStack(spacing: 4) {
                     PulsingDot(color: ClientFeedbackLimitManager.canSubmit() ? AppTheme.neonCyan : Color(red: 1.0, green: 0.35, blue: 0.35), size: 5)
-                    Text("HÔM NAY: \(ClientFeedbackLimitManager.todaySubmissionCount())/2")
+                    Text(language.text("home.feedback.today_count", ClientFeedbackLimitManager.todaySubmissionCount()))
                         .font(.system(size: 9, weight: .bold, design: .monospaced))
                         .foregroundStyle(ClientFeedbackLimitManager.canSubmit() ? AppTheme.neonCyan : Color(red: 1.0, green: 0.45, blue: 0.45))
                 }
             }
 
-            Text("Báo cáo trạng thái tài khoản để server ghi nhận và phân tích (tối đa 2 lần/ngày cho mỗi máy & key).")
+            Text(language.text("home.feedback.description"))
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .lineLimit(2)
@@ -635,7 +636,7 @@ struct GamesHomeView: View {
                 // 1. Nút Báo cáo bị ban
                 Button {
                     if !ClientFeedbackLimitManager.canSubmit() {
-                        feedbackAlertMessage = "Bạn đã gửi phản hồi tối đa 2 lần trong ngày hôm nay (mỗi máy/mỗi key tối đa 2 lần/ngày). Vui lòng quay lại vào ngày mai!"
+                        feedbackAlertMessage = language.text("home.feedback.limit_reached")
                         showingFeedbackAlert = true
                     } else {
                         showingBanReportDialog = true
@@ -644,7 +645,7 @@ struct GamesHomeView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "exclamationmark.octagon.fill")
                             .font(.system(size: 11, weight: .bold))
-                        Text("Báo Cáo Bị Ban")
+                        Text(language.text("home.feedback.report_ban"))
                             .font(.system(size: 11, weight: .bold))
                     }
                     .frame(maxWidth: .infinity)
@@ -666,7 +667,7 @@ struct GamesHomeView: View {
                 // 2. Nút Vẫn đang an toàn
                 Button {
                     if !ClientFeedbackLimitManager.canSubmit() {
-                        feedbackAlertMessage = "Bạn đã gửi phản hồi tối đa 2 lần trong ngày hôm nay (mỗi máy/mỗi key tối đa 2 lần/ngày). Vui lòng quay lại vào ngày mai!"
+                        feedbackAlertMessage = language.text("home.feedback.limit_reached")
                         showingFeedbackAlert = true
                     } else {
                         Task { await submitFeedback(status: .safe) }
@@ -677,13 +678,13 @@ struct GamesHomeView: View {
                             ProgressView()
                                 .progressViewStyle(CircularProgressViewStyle(tint: .black))
                                 .scaleEffect(0.65)
-                            Text("Đang gửi...")
+                            Text(language.text("home.feedback.sending"))
                                 .font(.system(size: 11, weight: .bold))
                                 .foregroundStyle(.black)
                         } else {
                             Image(systemName: "checkmark.shield.fill")
                                 .font(.system(size: 11, weight: .bold))
-                            Text("Vẫn Đang An Toàn")
+                            Text(language.text("home.feedback.still_safe"))
                                 .font(.system(size: 11, weight: .bold))
                         }
                     }
@@ -742,14 +743,14 @@ struct GamesHomeView: View {
                         .foregroundStyle(AppTheme.neonMagenta)
                 }
 
-                Text("HƯỚNG DẪN SỬ DỤNG")
+                Text(language.text("home.tutorial.title"))
                     .font(.system(size: 12, weight: .black, design: .monospaced))
                     .foregroundStyle(.primary)
 
                 Spacer()
 
                 HStack(spacing: 4) {
-                    Text("VIDEO HD")
+                    Text(language.text("home.tutorial.badge"))
                         .font(.system(size: 10, weight: .bold, design: .monospaced))
                 }
                 .foregroundStyle(AppTheme.neonCyan)
@@ -823,10 +824,10 @@ struct GamesHomeView: View {
 
             // Title & Subtitle
             VStack(alignment: .leading, spacing: 3) {
-                Text(tutorialVideoInfo?.displayTitle ?? "Hướng Dẫn Cài Đặt & Kích Hoạt Patch")
+                Text(tutorialVideoInfo?.displayTitle(language: language) ?? language.text("home.tutorial.default_title"))
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(.primary)
-                Text("Bấm để xem video clip hướng dẫn MP4")
+                Text(language.text("home.tutorial.subtitle"))
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
@@ -837,7 +838,7 @@ struct GamesHomeView: View {
                     showingVideoPlayer = true
                 } label: {
                     HStack(spacing: 6) {
-                        Text("Xem Video Ngay")
+                        Text(language.text("home.tutorial.watch_now"))
                             .font(.system(size: 12, weight: .bold))
                         Image(systemName: "play.fill")
                             .font(.system(size: 10, weight: .bold))
@@ -863,7 +864,7 @@ struct GamesHomeView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "globe")
                             .font(.system(size: 12, weight: .semibold))
-                        Text("Mở Safari")
+                        Text(language.text("home.tutorial.open_safari"))
                             .font(.system(size: 12, weight: .semibold))
                     }
                     .frame(maxWidth: .infinity)
@@ -891,21 +892,20 @@ struct GamesHomeView: View {
                 .strokeBorder(
                     LinearGradient(
                         colors: [
-                            AppTheme.neonMagenta.opacity(0.85),
-                            AppTheme.neonViolet.opacity(0.5),
-                            AppTheme.neonCyan.opacity(0.7)
+                            AppTheme.neonMagenta.opacity(0.65),
+                            AppTheme.neonCyan.opacity(0.4)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ),
-                    lineWidth: 1.4
+                    lineWidth: 1.2
                 )
         )
-        .shadow(color: AppTheme.neonMagenta.opacity(0.25), radius: 10)
+        .shadow(color: AppTheme.neonMagenta.opacity(0.2), radius: 8)
         .sheet(isPresented: $showingVideoPlayer) {
             TutorialVideoModalView(
                 videoURL: tutorialVideoInfo?.resolvedURL ?? PatchHubService.defaultTutorialVideoURL,
-                title: tutorialVideoInfo?.displayTitle ?? "Hướng Dẫn Sử Dụng"
+                title: tutorialVideoInfo?.displayTitle(language: language) ?? language.text("home.tutorial.modal_title")
             )
         }
     }
@@ -1098,6 +1098,7 @@ struct SafariView: UIViewControllerRepresentable {
 }
 
 struct TutorialVideoModalView: View {
+    @Environment(\.appLanguage) private var language
     let videoURL: URL
     let title: String
     @Environment(\.dismiss) private var dismiss
@@ -1126,7 +1127,7 @@ struct TutorialVideoModalView: View {
                     } label: {
                         HStack(spacing: 4) {
                             Image(systemName: "xmark.circle.fill")
-                            Text("Đóng")
+                            Text(language.text("common.close"))
                         }
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(AppTheme.neonMagenta)

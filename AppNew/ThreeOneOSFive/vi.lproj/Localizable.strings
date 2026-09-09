@@ -533,3 +533,52 @@
 "wallpaper.error.install" = "Cài đặt thất bại và mọi descriptor đã thêm trong lần thử này đã được rollback.";
 "wallpaper.error.restore" = "3105 không thể xóa an toàn toàn bộ descriptor của lần cài này.";
 "wallpaper.error.unknown" = "Đã xảy ra lỗi không mong muốn. Hãy kiểm tra Nhật ký phiên để biết chi tiết.";
+
+/* Home - Device Status */
+"home.status.title" = "TRẠNG THÁI THIẾT BỊ";
+"home.status.model" = "Kiểu máy";
+"home.status.os" = "Hệ điều hành";
+"home.status.root" = "Quyền root";
+"home.status.untethered" = "Untethered";
+"home.status.battery" = "Pin";
+"home.status.storage" = "Dung lượng";
+"home.status.storage_used" = "%lldGB / %lldGB đã dùng";
+
+/* Home - DNS Antiban */
+"home.dns.title" = "DNS ANTIBAN";
+"home.dns.status" = "Trạng thái";
+"home.dns.protected" = "ĐƯỢC BẢO VỆ";
+"home.dns.server" = "Máy chủ DNS";
+"home.dns.region" = "Khu vực";
+"home.dns.global" = "TOÀN CẦU";
+"home.dns.download" = "Tải Về Máy";
+"home.dns.open_safari" = "Mở Safari";
+
+/* Home - Client Feedback */
+"home.feedback.title" = "PHẢN HỒI TỪ CLIENT";
+"home.feedback.today_count" = "HÔM NAY: %lld/2";
+"home.feedback.description" = "Báo cáo trạng thái tài khoản để server ghi nhận và phân tích (tối đa 2 lần/ngày cho mỗi máy & key).";
+"home.feedback.report_ban" = "Báo Cáo Bị Ban";
+"home.feedback.still_safe" = "Vẫn Đang An Toàn";
+"home.feedback.sending" = "Đang gửi...";
+"home.feedback.dialog_title" = "Báo Cáo Bị Khóa Tài Khoản (Ban)";
+"home.feedback.dialog_message" = "Chọn thời gian tài khoản game bị khóa để hệ thống ghi nhận, phân tích nguyên nhân và cập nhật DNS/patch.";
+"home.feedback.banned_3d" = "🚨 Bị ban 3 ngày";
+"home.feedback.banned_7d" = "⚠️ Bị ban 7 ngày";
+"home.feedback.banned_perm" = "☠️ Bị ban vĩnh viễn";
+"home.feedback.alert_title" = "Thông Báo Phản Hồi";
+"home.feedback.alert_dismiss" = "Đã Hiểu";
+"home.feedback.safe_success" = "Cảm ơn bạn! Đã ghi nhận hệ thống vẫn hoạt động an toàn.";
+"home.feedback.ban_success" = "Đã tiếp nhận báo cáo bị ban. Đội ngũ sẽ phân tích và cải tiến app/DNS ngay!";
+"home.feedback.remaining_note" = "\n\n(Hôm nay còn lại %lld/2 lượt gửi)";
+"home.feedback.limit_reached" = "Bạn đã gửi phản hồi tối đa 2 lần trong ngày hôm nay (mỗi máy/mỗi key tối đa 2 lần/ngày). Vui lòng quay lại vào ngày mai!";
+"home.feedback.error" = "Không thể gửi phản hồi: %@";
+
+/* Home - Tutorial Video */
+"home.tutorial.title" = "HƯỚNG DẪN SỬ DỤNG";
+"home.tutorial.badge" = "VIDEO HD";
+"home.tutorial.default_title" = "Hướng Dẫn Cài Đặt & Kích Hoạt Patch";
+"home.tutorial.subtitle" = "Bấm để xem video clip hướng dẫn MP4";
+"home.tutorial.watch_now" = "Xem Video Ngay";
+"home.tutorial.open_safari" = "Mở Safari";
+"home.tutorial.modal_title" = "Hướng Dẫn Sử Dụng";
