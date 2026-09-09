@@ -1,4 +1,5 @@
 import AVKit
+import SafariServices
 import SwiftUI
 import UIKit
 
@@ -12,9 +13,7 @@ struct GamesHomeView: View {
     @State private var selectedGame: RemoteGameSummary?
     @State private var dnsInfo: RemoteDnsAntibanInfo?
     @State private var isLoadingDns = false
-    @State private var isDownloadingDns = false
-    @State private var dnsErrorMessage: String?
-    @State private var dnsShareItem: DnsShareItem?
+    @State private var showingDnsSafari = false
     @State private var tutorialVideoInfo: RemoteTutorialVideoInfo?
     @State private var isLoadingVideoInfo = false
     @State private var showingVideoPlayer = false
@@ -110,12 +109,22 @@ struct GamesHomeView: View {
                     draftCoordinator.clear()
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
+                AnnouncementSnoozeManager.recordBackground()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+                AnnouncementSnoozeManager.checkForegroundResume()
+                Task {
+                    await loadAnnouncementPopup()
+                }
+            }
         }
         .overlay {
             if showingAnnouncementPopup, let announcement = activeAnnouncement {
                 AnnouncementPopupDialog(
                     announcement: announcement,
                     onDismiss: {
+                        AnnouncementSnoozeManager.markDismissedOrShown()
                         withAnimation(.easeOut(duration: 0.25)) {
                             showingAnnouncementPopup = false
                         }
@@ -220,24 +229,6 @@ struct GamesHomeView: View {
         isLoadingDns = false
     }
 
-    private func downloadDnsAntiban() async {
-        guard !isDownloadingDns else { return }
-        isDownloadingDns = true
-        dnsErrorMessage = nil
-        do {
-            let localURL = try await PatchHubService.downloadDnsAntiban(suggestedFilename: dnsInfo?.fileName)
-            await MainActor.run {
-                isDownloadingDns = false
-                dnsShareItem = DnsShareItem(url: localURL)
-            }
-        } catch {
-            await MainActor.run {
-                isDownloadingDns = false
-                dnsErrorMessage = "Lỗi khi tải DNS: \(error.localizedDescription)"
-            }
-        }
-    }
-
     private func openDnsInSafari() {
         let url = PatchHubService.dnsAntibanDownloadURL
         if UIApplication.shared.canOpenURL(url) {
@@ -262,16 +253,25 @@ struct GamesHomeView: View {
 
     private func submitFeedback(status: ClientFeedbackStatus) async {
         guard !isSubmittingFeedback else { return }
+        guard ClientFeedbackLimitManager.canSubmit() else {
+            await MainActor.run {
+                feedbackAlertMessage = "Bạn đã gửi phản hồi tối đa 2 lần trong ngày hôm nay (mỗi máy/mỗi key tối đa 2 lần/ngày). Vui lòng quay lại vào ngày mai!"
+                showingFeedbackAlert = true
+            }
+            return
+        }
         isSubmittingFeedback = true
         do {
             let res = try await PatchHubService.sendClientFeedback(status: status)
+            ClientFeedbackLimitManager.recordSubmission()
+            let remaining = ClientFeedbackLimitManager.remainingSubmissionsToday()
             await MainActor.run {
                 isSubmittingFeedback = false
-                feedbackAlertMessage = res.message ?? (
-                    status == .safe
-                        ? "Cảm ơn bạn! Đã ghi nhận hệ thống vẫn hoạt động an toàn."
-                        : "Đã tiếp nhận báo cáo bị ban. Đội ngũ sẽ phân tích và cải tiến app/DNS ngay!"
-                )
+                let defaultMsg = status == .safe
+                    ? "Cảm ơn bạn! Đã ghi nhận hệ thống vẫn hoạt động an toàn."
+                    : "Đã tiếp nhận báo cáo bị ban. Đội ngũ sẽ phân tích và cải tiến app/DNS ngay!"
+                let serverMsg = res.message ?? defaultMsg
+                feedbackAlertMessage = "\(serverMsg)\n\n(Hôm nay còn lại \(remaining)/2 lượt gửi)"
                 showingFeedbackAlert = true
             }
         } catch {
@@ -284,9 +284,11 @@ struct GamesHomeView: View {
     }
 
     private func loadAnnouncementPopup() async {
-        guard !AnnouncementSnoozeManager.isSnoozed() else { return }
+        guard AnnouncementSnoozeManager.shouldShowAnnouncement() else { return }
         if let ann = try? await PatchHubService.fetchLatestAnnouncement(), ann.isPopup != false {
             await MainActor.run {
+                guard AnnouncementSnoozeManager.shouldShowAnnouncement() else { return }
+                AnnouncementSnoozeManager.markDismissedOrShown()
                 self.activeAnnouncement = ann
                 withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {
                     self.showingAnnouncementPopup = true
@@ -327,7 +329,7 @@ struct GamesHomeView: View {
                             )
                     }
 
-                    Text("CYBERPATCH")
+                    Text("PROXYVIPVN V2")
                         .font(.system(size: 20, weight: .black, design: .monospaced))
                         .foregroundStyle(
                             LinearGradient(
@@ -379,13 +381,13 @@ struct GamesHomeView: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
-                        Text("Hi, NeoX")
+                        Text("Hi, Gay")
                             .font(.system(size: 14, weight: .bold))
                             .foregroundStyle(.primary)
                         Text("|")
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
-                        Text("Level 42")
+                        Text("Ver 1.0.5")
                             .font(.system(size: 12, weight: .bold, design: .monospaced))
                             .foregroundStyle(AppTheme.neonCyan)
                     }
@@ -497,23 +499,13 @@ struct GamesHomeView: View {
             // Nút Tải Về DNS Antiban
             HStack(spacing: 5) {
                 Button {
-                    if isDownloadingDns { return }
-                    Task { await downloadDnsAntiban() }
+                    showingDnsSafari = true
                 } label: {
                     HStack(spacing: 4) {
-                        if isDownloadingDns {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .black))
-                                .scaleEffect(0.6)
-                            Text("Đang tải...")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(.black)
-                        } else {
-                            Image(systemName: "arrow.down.circle.fill")
-                                .font(.system(size: 11, weight: .bold))
-                            Text("Tải Về Máy")
-                                .font(.system(size: 10, weight: .bold))
-                        }
+                        Image(systemName: "arrow.down.circle.fill")
+                            .font(.system(size: 11, weight: .bold))
+                        Text("Tải Về Máy")
+                            .font(.system(size: 10, weight: .bold))
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 6)
@@ -529,7 +521,6 @@ struct GamesHomeView: View {
                     .shadow(color: AppTheme.neonLime.opacity(0.4), radius: 4, y: 1)
                 }
                 .buttonStyle(.plain)
-                .disabled(isDownloadingDns)
 
                 Button {
                     openDnsInSafari()
@@ -560,8 +551,9 @@ struct GamesHomeView: View {
                 .strokeBorder(AppTheme.neonLime.opacity(0.75), lineWidth: 1.2)
         )
         .shadow(color: AppTheme.neonLime.opacity(0.2), radius: 6)
-        .sheet(item: $dnsShareItem) { item in
-            DnsActivityShareSheet(items: [item.url])
+        .sheet(isPresented: $showingDnsSafari) {
+            SafariView(url: PatchHubService.dnsAntibanDownloadURL)
+                .ignoresSafeArea()
         }
     }
 
@@ -626,13 +618,15 @@ struct GamesHomeView: View {
 
                 Spacer()
 
-                PulsingDot(color: AppTheme.neonCyan, size: 5)
-                Text("TELEMETRY")
-                    .font(.system(size: 9, weight: .bold, design: .monospaced))
-                    .foregroundStyle(AppTheme.neonCyan)
+                HStack(spacing: 4) {
+                    PulsingDot(color: ClientFeedbackLimitManager.canSubmit() ? AppTheme.neonCyan : Color(red: 1.0, green: 0.35, blue: 0.35), size: 5)
+                    Text("HÔM NAY: \(ClientFeedbackLimitManager.todaySubmissionCount())/2")
+                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .foregroundStyle(ClientFeedbackLimitManager.canSubmit() ? AppTheme.neonCyan : Color(red: 1.0, green: 0.45, blue: 0.45))
+                }
             }
 
-            Text("Báo cáo trạng thái tài khoản để server ghi nhận, phân tích và cải tiến app/DNS.")
+            Text("Báo cáo trạng thái tài khoản để server ghi nhận và phân tích (tối đa 2 lần/ngày cho mỗi máy & key).")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .lineLimit(2)
@@ -640,7 +634,12 @@ struct GamesHomeView: View {
             HStack(spacing: 10) {
                 // 1. Nút Báo cáo bị ban
                 Button {
-                    showingBanReportDialog = true
+                    if !ClientFeedbackLimitManager.canSubmit() {
+                        feedbackAlertMessage = "Bạn đã gửi phản hồi tối đa 2 lần trong ngày hôm nay (mỗi máy/mỗi key tối đa 2 lần/ngày). Vui lòng quay lại vào ngày mai!"
+                        showingFeedbackAlert = true
+                    } else {
+                        showingBanReportDialog = true
+                    }
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "exclamationmark.octagon.fill")
@@ -666,7 +665,12 @@ struct GamesHomeView: View {
 
                 // 2. Nút Vẫn đang an toàn
                 Button {
-                    Task { await submitFeedback(status: .safe) }
+                    if !ClientFeedbackLimitManager.canSubmit() {
+                        feedbackAlertMessage = "Bạn đã gửi phản hồi tối đa 2 lần trong ngày hôm nay (mỗi máy/mỗi key tối đa 2 lần/ngày). Vui lòng quay lại vào ngày mai!"
+                        showingFeedbackAlert = true
+                    } else {
+                        Task { await submitFeedback(status: .safe) }
+                    }
                 } label: {
                     HStack(spacing: 6) {
                         if isSubmittingFeedback {
@@ -910,7 +914,7 @@ struct GamesHomeView: View {
     private var gameLibrarySection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("GAME LIBRARY")
+                Text("LIST GAMES")
                     .font(.system(size: 13, weight: .black, design: .monospaced))
                     .foregroundStyle(.primary)
                 Spacer()
@@ -1078,19 +1082,19 @@ extension Color {
     }
 }
 
-struct DnsShareItem: Identifiable {
-    let id = UUID()
+struct SafariView: UIViewControllerRepresentable {
     let url: URL
-}
 
-struct DnsActivityShareSheet: UIViewControllerRepresentable {
-    let items: [Any]
-
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    func makeUIViewController(context: Context) -> SFSafariViewController {
+        let config = SFSafariViewController.Configuration()
+        config.entersReaderIfAvailable = false
+        let vc = SFSafariViewController(url: url, configuration: config)
+        vc.preferredControlTintColor = UIColor(AppTheme.neonCyan)
+        vc.dismissButtonStyle = .done
+        return vc
     }
 
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+    func updateUIViewController(_ uiViewController: SFSafariViewController, context: Context) {}
 }
 
 struct TutorialVideoModalView: View {

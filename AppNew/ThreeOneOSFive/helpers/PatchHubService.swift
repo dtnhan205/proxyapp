@@ -156,6 +156,97 @@ struct ClientFeedbackResponse: Decodable, Equatable {
     let reportId: String?
 }
 
+enum ClientFeedbackLimitManager {
+    private static let storageKey = "client_feedback_submission_records"
+    static let maxDailySubmissions = 2
+
+    struct SubmissionRecord: Codable {
+        let timestamp: TimeInterval
+        let key: String
+        let deviceId: String
+    }
+
+    private static func loadRecords() -> [SubmissionRecord] {
+        guard let data = UserDefaults.standard.data(forKey: storageKey),
+              let records = try? JSONDecoder().decode([SubmissionRecord].self, from: data) else {
+            return []
+        }
+        return records
+    }
+
+    private static func saveRecords(_ records: [SubmissionRecord]) {
+        if let data = try? JSONEncoder().encode(records) {
+            UserDefaults.standard.set(data, forKey: storageKey)
+        }
+    }
+
+    /// Lọc các lượt gửi trong ngày hôm nay (theo Calendar hiện tại) của máy và key này
+    private static func todayRecords(
+        key: String? = nil,
+        deviceId: String? = nil
+    ) -> [SubmissionRecord] {
+        let currentKey = (key ?? LicenseStore.shared.savedKey ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let currentDevice = (deviceId ?? DeviceIdentity.serial()).trimmingCharacters(in: .whitespacesAndNewlines)
+        let calendar = Calendar.current
+        let all = loadRecords()
+
+        return all.filter { record in
+            let date = Date(timeIntervalSince1970: record.timestamp)
+            guard calendar.isDateInToday(date) else { return false }
+
+            let matchDevice = !currentDevice.isEmpty && record.deviceId == currentDevice
+            let matchKey = !currentKey.isEmpty && record.key == currentKey
+            return matchDevice || matchKey
+        }
+    }
+
+    /// Số lần đã gửi trong ngày hôm nay
+    static func todaySubmissionCount(
+        key: String? = nil,
+        deviceId: String? = nil
+    ) -> Int {
+        return todayRecords(key: key, deviceId: deviceId).count
+    }
+
+    /// Số lần còn lại có thể gửi trong ngày hôm nay (tối đa 2 lần/ngày)
+    static func remainingSubmissionsToday(
+        key: String? = nil,
+        deviceId: String? = nil
+    ) -> Int {
+        let count = todaySubmissionCount(key: key, deviceId: deviceId)
+        return max(0, maxDailySubmissions - count)
+    }
+
+    /// Kiểm tra xem còn được phép gửi phản hồi hay không (< 2 lần/ngày)
+    static func canSubmit(
+        key: String? = nil,
+        deviceId: String? = nil
+    ) -> Bool {
+        return todaySubmissionCount(key: key, deviceId: deviceId) < maxDailySubmissions
+    }
+
+    /// Ghi nhận 1 lượt gửi thành công
+    static func recordSubmission(
+        key: String? = nil,
+        deviceId: String? = nil
+    ) {
+        var records = loadRecords()
+        let sevenDaysAgo = Date().addingTimeInterval(-7 * 86400).timeIntervalSince1970
+        records.removeAll { $0.timestamp < sevenDaysAgo }
+
+        let currentKey = (key ?? LicenseStore.shared.savedKey ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let currentDevice = (deviceId ?? DeviceIdentity.serial()).trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let newRecord = SubmissionRecord(
+            timestamp: Date().timeIntervalSince1970,
+            key: currentKey,
+            deviceId: currentDevice
+        )
+        records.append(newRecord)
+        saveRecords(records)
+    }
+}
+
 struct RemoteAnnouncementInfo: Decodable, Equatable, Identifiable {
     let id: String
     let title: String
@@ -170,7 +261,13 @@ struct RemoteAnnouncementInfo: Decodable, Equatable, Identifiable {
 enum AnnouncementSnoozeManager {
     private static let snoozeUntilKey = "announcement_snooze_until_timestamp"
     private static let lastSnoozedIdKey = "announcement_last_snoozed_id"
+    private static var lastBackgroundTime: Date? = nil
 
+    /// Cờ in-memory: Đã hiển thị hoặc đã đóng popup trong phiên mở app hiện tại.
+    /// Khởi tạo lại là false khi app cold-start (thoát app vào lại).
+    private(set) static var hasShownInSession: Bool = false
+
+    /// Kiểm tra xem người dùng có đang trong thời gian hoãn 2 giờ hay không.
     static func isSnoozed() -> Bool {
         let until = UserDefaults.standard.double(forKey: snoozeUntilKey)
         guard until > 0 else { return false }
@@ -178,12 +275,60 @@ enum AnnouncementSnoozeManager {
         return now < until
     }
 
+    /// Hoãn hiển thị thông báo trong 2 giờ (khi bấm nút "Đóng 2 Giờ").
     static func snoozeTwoHours(for id: String? = nil) {
         let twoHoursLater = Date().addingTimeInterval(2 * 3600).timeIntervalSince1970
         UserDefaults.standard.set(twoHoursLater, forKey: snoozeUntilKey)
         if let id {
             UserDefaults.standard.set(id, forKey: lastSnoozedIdKey)
         }
+        hasShownInSession = true
+    }
+
+    /// Đánh dấu là đã hiển thị hoặc người dùng bấm Đóng trong phiên mở app này,
+    /// ngăn việc popup liên tục hiện mỗi khi quay lại trang Home.
+    static func markDismissedOrShown() {
+        hasShownInSession = true
+    }
+
+    /// Ghi nhận thời điểm app chuyển sang trạng thái background.
+    static func recordBackground() {
+        lastBackgroundTime = Date()
+    }
+
+    /// Khi app quay lại từ background, nếu đã ra ngoài trên 5 phút thì xem như phiên mới.
+    static func checkForegroundResume() {
+        if let bgTime = lastBackgroundTime, Date().timeIntervalSince(bgTime) >= 300 {
+            hasShownInSession = false
+        }
+        lastBackgroundTime = nil
+    }
+
+    /// Kiểm tra xem popup có được phép hiển thị hay không:
+    /// - Không hiện nếu đang trong thời gian hoãn 2 giờ (isSnoozed).
+    /// - Tự động xóa mốc hoãn khi đã qua 2 giờ để cho phép hiện lại.
+    /// - Chỉ hiển thị 1 lần trong phiên mở app hiện tại (tránh việc cứ ra trang Home là hiện).
+    static func shouldShowAnnouncement() -> Bool {
+        let until = UserDefaults.standard.double(forKey: snoozeUntilKey)
+        let now = Date().timeIntervalSince1970
+
+        if until > 0 {
+            if now < until {
+                // Vẫn đang trong thời gian hoãn 2 giờ
+                return false
+            } else {
+                // Đã hết 2 giờ hoãn -> xóa cờ snooze và cho phép hiển thị lại
+                UserDefaults.standard.removeObject(forKey: snoozeUntilKey)
+                hasShownInSession = false
+            }
+        }
+
+        // Trong cùng một phiên chạy app, chỉ hiển thị 1 lần khi vào app
+        if hasShownInSession {
+            return false
+        }
+
+        return true
     }
 }
 
@@ -282,9 +427,12 @@ enum PatchHubService {
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.timeoutInterval = 10
+        let key = LicenseStore.shared.savedKey ?? ""
         let body: [String: Any] = [
             "status": status.rawValue,
             "deviceId": DeviceIdentity.serial(),
+            "key": key,
+            "licenseKey": key,
             "appVersion": AppInfo.osVersion,
             "gameId": gameId ?? "",
             "gameName": gameName ?? "",
