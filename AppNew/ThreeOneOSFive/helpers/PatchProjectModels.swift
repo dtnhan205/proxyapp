@@ -36,7 +36,7 @@ struct PatchRule: Codable, Identifiable, Hashable {
     }
 
     var canToggle: Bool {
-        originalData != nil
+        hasReplacement
     }
 }
 

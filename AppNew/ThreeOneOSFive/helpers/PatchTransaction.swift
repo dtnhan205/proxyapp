@@ -593,24 +593,38 @@ enum PatchTransaction {
         containerRoot: URL,
         fileManager: FileManager = .default
     ) throws {
-        let data: Data
-        if isOn {
-            data = rule.replacementData
-            patchLog("[\(rule.relativePath)] Enabling patch...")
-        } else {
-            guard let originalData = rule.originalData else {
-                patchLogError("[\(rule.relativePath)] No original data available")
-                throw PatchPackageError.invalidProject
-            }
-            data = originalData
-            patchLog("[\(rule.relativePath)] Restoring original...")
-        }
         let root = PatchPathValidator.canonicalFileURL(containerRoot)
         let target = try PatchPathValidator.resolveContainedTargetURL(relativePath: rule.relativePath, containerRoot: root)
         patchLogDebug("[\(rule.relativePath)] Target: \(target.path)")
-        try validateTarget(target, relativePath: rule.relativePath, containerRoot: root, fileManager: fileManager)
-        try atomicWrite(data, to: target, preservingExistingAttributes: true, fileManager: fileManager)
-        patchLogSuccess("[\(rule.relativePath)] \(isOn ? "Patch applied" : "Restored")")
+
+        if isOn {
+            patchLog("[\(rule.relativePath)] Enabling patch...")
+            let parentDir = target.deletingLastPathComponent()
+            if !fileManager.fileExists(atPath: parentDir.path) {
+                try fileManager.createDirectory(at: parentDir, withIntermediateDirectories: true)
+            }
+            try validateTarget(target, relativePath: rule.relativePath, containerRoot: root, fileManager: fileManager)
+            try atomicWrite(rule.replacementData, to: target, preservingExistingAttributes: true, fileManager: fileManager)
+            patchLogSuccess("[\(rule.relativePath)] Patch applied")
+        } else {
+            if let originalData = rule.originalData {
+                patchLog("[\(rule.relativePath)] Restoring original...")
+                let parentDir = target.deletingLastPathComponent()
+                if !fileManager.fileExists(atPath: parentDir.path) {
+                    try fileManager.createDirectory(at: parentDir, withIntermediateDirectories: true)
+                }
+                try validateTarget(target, relativePath: rule.relativePath, containerRoot: root, fileManager: fileManager)
+                try atomicWrite(originalData, to: target, preservingExistingAttributes: true, fileManager: fileManager)
+                patchLogSuccess("[\(rule.relativePath)] Restored original")
+            } else {
+                // VIP / New file rule: no original file existed on device, so restoring removes the added file
+                patchLog("[\(rule.relativePath)] Restoring: removing new file...")
+                if fileManager.fileExists(atPath: target.path) {
+                    try fileManager.removeItem(at: target)
+                }
+                patchLogSuccess("[\(rule.relativePath)] Removed new file (restored)")
+            }
+        }
     }
 
     /// Reads back whatever is currently on disk for this rule and reports whether it matches
@@ -618,19 +632,27 @@ enum PatchTransaction {
     /// state without trusting any locally cached assumption.
     static func currentRuleState(rule: PatchRule, containerRoot: URL, fileManager: FileManager = .default) -> Bool? {
         let root = PatchPathValidator.canonicalFileURL(containerRoot)
-        guard let target = try? PatchPathValidator.resolveContainedTargetURL(relativePath: rule.relativePath, containerRoot: root),
-              let current = try? Data(contentsOf: target)
+        guard let target = try? PatchPathValidator.resolveContainedTargetURL(relativePath: rule.relativePath, containerRoot: root)
         else {
             return nil
         }
-        let currentDigest = Data(SHA256.hash(data: current))
-        if currentDigest == Data(SHA256.hash(data: rule.replacementData)) {
-            return true
+        if fileManager.fileExists(atPath: target.path), let current = try? Data(contentsOf: target) {
+            let currentDigest = Data(SHA256.hash(data: current))
+            if currentDigest == Data(SHA256.hash(data: rule.replacementData)) {
+                return true
+            }
+            if let originalData = rule.originalData, currentDigest == Data(SHA256.hash(data: originalData)) {
+                return false
+            }
+            return nil
+        } else {
+            // Target file does not exist on disk
+            if rule.originalData == nil {
+                // For VIP / new file rules, non-existence on disk represents the pristine original state (OFF)
+                return false
+            }
+            return nil
         }
-        if let originalData = rule.originalData, currentDigest == Data(SHA256.hash(data: originalData)) {
-            return false
-        }
-        return nil
     }
 
     /// Đảm bảo đường dẫn target tồn tại, không qua symbolic link, và parent dirs là thư mục thật.
@@ -647,8 +669,8 @@ enum PatchTransaction {
         var cursor = PatchPathValidator.canonicalFileURL(containerRoot)
         for component in components.dropLast() {
             cursor.appendPathComponent(component, isDirectory: true)
-            guard fileManager.fileExists(atPath: cursor.path) else {
-                throw PatchPackageError.applyFailed
+            if !fileManager.fileExists(atPath: cursor.path) {
+                try fileManager.createDirectory(at: cursor, withIntermediateDirectories: true)
             }
             let values = try cursor.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
             guard values.isSymbolicLink != true else {
@@ -658,9 +680,11 @@ enum PatchTransaction {
                 throw PatchPackageError.applyFailed
             }
         }
-        let targetValues = try target.resourceValues(forKeys: [.isSymbolicLinkKey])
-        if targetValues.isSymbolicLink == true {
-            throw PatchPackageError.symbolicLinkUnsupported
+        if fileManager.fileExists(atPath: target.path) {
+            let targetValues = try target.resourceValues(forKeys: [.isSymbolicLinkKey])
+            if targetValues.isSymbolicLink == true {
+                throw PatchPackageError.symbolicLinkUnsupported
+            }
         }
     }
 
