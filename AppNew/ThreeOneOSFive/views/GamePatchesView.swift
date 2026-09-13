@@ -32,6 +32,33 @@ struct GamePatchesView: View {
     @AppStorage("patch.importedOnlineIDs") private var importedOnlineIDsRaw = ""
     @AppStorage("patch.gameAssignments") private var gameAssignmentsRaw = "{}"
     @AppStorage("patch.remoteToLocalMap") private var remoteToLocalMapRaw = "{}"
+    @AppStorage("patch.remotePatchNames") private var remotePatchNamesRaw = "{}"
+
+    /// Maps both local packageID -> server project name and serverID -> server project name,
+    /// ensuring patches always display the project name from the server instead of the 3105 file name.
+    private var remotePatchNames: [String: String] {
+        (try? JSONDecoder().decode([String: String].self, from: Data(remotePatchNamesRaw.utf8))) ?? [:]
+    }
+
+    private func displayName(for item: PatchLibraryItem) -> String {
+        let localID = item.id.uuidString
+        let names = remotePatchNames
+        if let serverName = names[localID], !serverName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return serverName
+        }
+        if let serverID = remoteToLocalMap.first(where: { $0.value == localID })?.key,
+           let serverName = names[serverID], !serverName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return serverName
+        }
+        if let projectName = item.project?.name, !projectName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return projectName
+        }
+        let fileName = item.packageURL.deletingPathExtension().lastPathComponent
+        if !fileName.isEmpty {
+            return fileName
+        }
+        return language.text("patch.locked_project")
+    }
 
     @ObservedObject private var appLog = AppLog.shared
 
@@ -314,7 +341,7 @@ struct GamePatchesView: View {
                 )
                 .shadow(color: rowColor.opacity(0.35), radius: 6)
             VStack(alignment: .leading, spacing: 3) {
-                Text(item.project?.name ?? language.text("patch.locked_project"))
+                Text(displayName(for: item))
                     .font(.body.weight(.semibold))
                     .foregroundStyle(.primary)
                 NeonShimmerBar(count: rules.count, tint: rowColor)
@@ -382,6 +409,7 @@ struct GamePatchesView: View {
         var imported = importedOnlineIDs
         var assignments = gameAssignments
         var remoteMap = remoteToLocalMap
+        var patchNames = remotePatchNames
         var didChange = false
 
         for (serverID, localID) in remoteMap where assignments[localID] == game.id && !remoteIDsForGame.contains(serverID) {
@@ -392,7 +420,24 @@ struct GamePatchesView: View {
             assignments.removeValue(forKey: localID)
             remoteMap.removeValue(forKey: serverID)
             imported.remove(serverID)
+            patchNames.removeValue(forKey: localID)
+            patchNames.removeValue(forKey: serverID)
             didChange = true
+        }
+
+        // Luôn cập nhật tên dự án từ server cho các patch hiện có
+        for remoteItem in remoteForGame {
+            let sName = remoteItem.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !sName.isEmpty {
+                if let localID = remoteMap[remoteItem.id], patchNames[localID] != sName {
+                    patchNames[localID] = sName
+                    didChange = true
+                }
+                if patchNames[remoteItem.id] != sName {
+                    patchNames[remoteItem.id] = sName
+                    didChange = true
+                }
+            }
         }
 
         let pending = remoteForGame.filter { !imported.contains($0.id) }
@@ -414,6 +459,11 @@ struct GamePatchesView: View {
                     imported.insert(item.id)
                     assignments[packageIDString] = game.id
                     remoteMap[item.id] = packageIDString
+                    let sName = item.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !sName.isEmpty {
+                        patchNames[packageIDString] = sName
+                        patchNames[item.id] = sName
+                    }
                     didChange = true
                 }
             } catch {
@@ -427,6 +477,9 @@ struct GamePatchesView: View {
         }
         if let encoded = try? JSONEncoder().encode(remoteMap), let json = String(data: encoded, encoding: .utf8) {
             remoteToLocalMapRaw = json
+        }
+        if let encoded = try? JSONEncoder().encode(patchNames), let json = String(data: encoded, encoding: .utf8) {
+            remotePatchNamesRaw = json
         }
         if didChange {
             store.reload()
@@ -528,7 +581,7 @@ struct GamePatchesView: View {
                         messageArgument: capturedFailure.localizationArgument
                     )
                 } else if actualState == isOn {
-                    let name = item.project?.name ?? language.text("patch.locked_project")
+                    let name = displayName(for: item)
                     let key = isOn ? "patch.toggle_on_success" : "patch.toggle_off_success"
                     toast = ToastMessage(text: language.text(key, name))
                 }

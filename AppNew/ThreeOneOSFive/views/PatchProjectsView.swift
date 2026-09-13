@@ -16,10 +16,20 @@ struct PatchProjectsView: View {
     @State private var showImporter = false
     @State private var searchText = ""
 
+    @AppStorage("patch.remotePatchNames") private var remotePatchNamesRaw = "{}"
+
+    private var remotePatchNames: [String: String] {
+        (try? JSONDecoder().decode([String: String].self, from: Data(remotePatchNamesRaw.utf8))) ?? [:]
+    }
+
     private var filteredItems: [PatchLibraryItem] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return store.items }
+        let names = remotePatchNames
         return store.items.filter { item in
+            if let serverName = names[item.id.uuidString], serverName.localizedCaseInsensitiveContains(query) {
+                return true
+            }
             if item.packageURL.lastPathComponent.localizedCaseInsensitiveContains(query) {
                 return true
             }
@@ -214,12 +224,28 @@ struct PatchProjectsView: View {
 private struct PatchProjectRow: View {
     let item: PatchLibraryItem
     let language: AppLanguage
+    @AppStorage("patch.remotePatchNames") private var remotePatchNamesRaw = "{}"
+
+    private var displayName: String {
+        let names = (try? JSONDecoder().decode([String: String].self, from: Data(remotePatchNamesRaw.utf8))) ?? [:]
+        if let serverName = names[item.id.uuidString], !serverName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return serverName
+        }
+        if let name = item.project?.name, !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return name
+        }
+        let fileName = item.packageURL.deletingPathExtension().lastPathComponent
+        if !fileName.isEmpty {
+            return fileName
+        }
+        return language.text("patch.locked_project")
+    }
 
     var body: some View {
         HStack(spacing: 12) {
             AppRowIcon(systemName: item.isLocked ? "lock.doc.fill" : "shippingbox.fill")
             VStack(alignment: .leading, spacing: 3) {
-                Text(item.project?.name ?? language.text("patch.locked_project"))
+                Text(displayName)
                     .font(.body.weight(.semibold))
                     .foregroundStyle(.primary)
                 Text(item.isLocked
@@ -301,8 +327,24 @@ private struct PatchProjectDetailView: View {
     @State private var actionAlert: PatchStoreAlert?
     @State private var shareRequest: PatchShareRequest?
 
+    @AppStorage("patch.remotePatchNames") private var remotePatchNamesRaw = "{}"
+
     private var item: PatchLibraryItem? {
         store.items.first(where: { $0.id == projectID })
+    }
+
+    private var displayName: String {
+        let names = (try? JSONDecoder().decode([String: String].self, from: Data(remotePatchNamesRaw.utf8))) ?? [:]
+        if let serverName = names[projectID.uuidString], !serverName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return serverName
+        }
+        if let name = item?.project?.name, !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return name
+        }
+        if let fileName = item?.packageURL.deletingPathExtension().lastPathComponent, !fileName.isEmpty {
+            return fileName
+        }
+        return language.text("patch.title")
     }
 
     private var receipt: PatchTransactionReceipt? {
@@ -416,7 +458,7 @@ private struct PatchProjectDetailView: View {
             }
         }
         .listStyle(.insetGrouped)
-        .navigationTitle(item?.project?.name ?? language.text("patch.title"))
+        .navigationTitle(displayName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
