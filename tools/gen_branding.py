@@ -21,21 +21,21 @@ from pathlib import Path
 # Brand strings theo từng ngôn ngữ. Thêm/sửa ở đây khi muốn đổi tên hiển thị.
 BRAND_STRINGS = {
     "en": {
-        "tabHome":       "ProxyVipVn V2",
+        "tabHome":       "ProxyIPA OB55",
         "tabFiles":      "Files",
         "tabPatches":    "Patches",
         "tabSettings":   "Settings",
         "tabWallpapers": "Wallpapers",
     },
     "vi": {
-        "tabHome":       "ProxyVipVn V2",
+        "tabHome":       "ProxyIPA OB55",
         "tabFiles":      "Tệp",
         "tabPatches":    "Patch",
         "tabSettings":   "Cài đặt",
         "tabWallpapers": "Hình nền",
     },
     "zhHans": {
-        "tabHome":       "ProxyVipVn V2 DSW",
+        "tabHome":       "ProxyIPA OB55 DSW",
         "tabFiles":      "文件",
         "tabPatches":    "补丁",
         "tabSettings":   "设置",

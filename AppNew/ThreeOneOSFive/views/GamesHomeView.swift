@@ -330,7 +330,7 @@ struct GamesHomeView: View {
                             )
                     }
 
-                    Text("PROXYVIPVN V2")
+                    Text("PROXYIPA OB55")
                         .font(.system(size: 20, weight: .black, design: .monospaced))
                         .foregroundStyle(
                             LinearGradient(

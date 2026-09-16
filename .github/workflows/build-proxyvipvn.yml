@@ -63,7 +63,7 @@ jobs:
 
           # Plaintext brand không được xuất hiện trong file generated.
           # Nếu script sinh nhầm plaintext thì fail build ngay.
-          if grep -q "ProxyVipVn V2" "$BRAND_FILE"; then
+          if grep -q "ProxyIPA OB55" "$BRAND_FILE"; then
             echo "::error::Plaintext brand leaked into AppBranding.swift"
             exit 1
           fi
