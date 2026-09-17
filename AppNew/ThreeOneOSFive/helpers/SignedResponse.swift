@@ -112,7 +112,7 @@ enum SignedResponse {
             throw SignedResponseError.malformedEnvelope
         }
         guard let dict = envelope as? [String: Any] else {
-            NSLog("[SignedResponse] step 1 FAIL: envelope is not [String: Any], got %@", type(of: envelope))
+            NSLog("[SignedResponse] step 1 FAIL: envelope is not [String: Any], got %@", String(describing: type(of: envelope)))
             throw SignedResponseError.malformedEnvelope
         }
         NSLog("[SignedResponse] step 1 OK: envelope keys = %@", dict.keys.joined(separator: ","))
@@ -131,7 +131,7 @@ enum SignedResponse {
         }
 
         guard let signatureString = dict["signature"] as? String else {
-            NSLog("[SignedResponse] step 2 FAIL: signature field is not a String, got %@", type(of: dict["signature"] ?? "nil"))
+            NSLog("[SignedResponse] step 2 FAIL: signature field is not a String, got %@", String(describing: type(of: dict["signature"] ?? "nil")))
             throw SignedResponseError.signatureDecodeFailed
         }
         guard let signatureData = Data(base64Encoded: signatureString) else {
@@ -141,14 +141,14 @@ enum SignedResponse {
         NSLog("[SignedResponse] step 2 OK: signature decoded (%d bytes)", signatureData.count)
 
         let payload = dict["data"]
-        guard payload != nil else {
+        guard let payloadNonOpt: Any = payload else {
             NSLog("[SignedResponse] step 2 FAIL: data field is nil")
             throw SignedResponseError.malformedEnvelope
         }
-        NSLog("[SignedResponse] step 2 OK: data field present, type = %@", type(of: payload!))
+        NSLog("[SignedResponse] step 2 OK: data field present, type = %@", String(describing: type(of: payloadNonOpt)))
 
         // 2. Re-canonical JSON cho đúng thứ tự key alphabet (giống server)
-        let canonical = canonicalJSONString(payload)
+        let canonical = canonicalJSONString(payloadNonOpt)
         guard let canonicalData = canonical.data(using: .utf8) else {
             NSLog("[SignedResponse] step 2 FAIL: canonical string → utf8 failed")
             throw SignedResponseError.malformedEnvelope
@@ -188,7 +188,7 @@ enum SignedResponse {
         let payloadData: Data
         do {
             payloadData = try JSONSerialization.data(
-                withJSONObject: payload,
+                withJSONObject: payloadNonOpt,
                 options: [.sortedKeys] // tránh khác biệt key order khi parse
             )
         } catch {
