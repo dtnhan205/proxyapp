@@ -104,6 +104,91 @@ enum DevicePatchService {
         }
     }
 
+    /// Kết quả thống kê của một lần auto-restore. Caller dùng để log cho user.
+    struct AutoRestoreReport {
+        var projectsScanned: Int = 0
+        var transactionsRestored: Int = 0
+        var rulesReverted: Int = 0
+        var skipped: Int = 0
+        var failures: [(projectName: String, reason: String)] = []
+    }
+
+    /// Revert MỌI patch đang active trên thiết bị về file gốc. Được gọi khi
+    /// key hết hạn / bị revoke / build bị revoke — giữ nguyên patch project
+    /// trong thư viện + license key trong UserDefaults; user gia hạn key
+    /// xong vẫn dùng lại được (toggle sẽ tự apply lại).
+    ///
+    /// Hai cơ chế restore cùng lúc để cover mọi trường hợp:
+    ///   1. **Journal-based**: với mọi project có `latestReceipt` (do
+    ///      `PatchTransaction.apply` tạo), gọi `restore(receipt:)` để revert
+    ///      files theo backup trong `Backups/{projectID}/{transactionID}/`.
+    ///   2. **Rule-based**: với mọi rule còn đang bật (`currentRuleState`),
+    ///      gọi `setRuleState(false, rule:)` để restore `originalData` được
+    ///      bundle trong rule (hoặc xoá file với VIP / new-file rule).
+    ///
+    /// Mỗi project được xử lý độc lập — một project lỗi (container không
+    /// truy cập được, file gốc đã bị xoá khỏi backup, …) không chặn các
+    /// project khác. Kết quả tổng hợp trong `AutoRestoreReport`.
+    @discardableResult
+    static func restoreAllAppliedPatches() -> AutoRestoreReport {
+        let items = PatchProjectLibrary.load()
+        var report = AutoRestoreReport()
+        report.projectsScanned = items.count
+        patchLog("Auto-restore: scanning \(items.count) patch project(s)")
+
+        for item in items {
+            let projectName = item.project?.name ?? item.summary.packageID.uuidString
+
+            // 1) Revert theo journal (transaction-based apply)
+            if let receipt = latestReceipt(projectID: item.id) {
+                do {
+                    try restore(receipt: receipt)
+                    report.transactionsRestored += 1
+                    patchLog("Auto-restore: reverted journal \(receipt.id.uuidString.prefix(8))… for \(projectName)")
+                } catch let error as PatchPackageError {
+                    let msg = "\(error.localizationKey)\(error.localizationArgument.map { ": \($0)" } ?? "")"
+                    report.failures.append((projectName: projectName, reason: "journal: \(msg)"))
+                    patchLogError("Auto-restore: journal revert failed for \(projectName) — \(msg)")
+                } catch {
+                    report.failures.append((projectName: projectName, reason: "journal: \(error.localizedDescription)"))
+                    patchLogError("Auto-restore: journal revert failed for \(projectName) — \(error.localizedDescription)")
+                }
+            }
+
+            // 2) Revert từng rule đang ON (toggle-based patches — không có backup riêng,
+            //    nhưng rule đã bundle sẵn originalData nên có thể revert an toàn).
+            guard let project = item.project else {
+                report.skipped += 1
+                continue
+            }
+            for rule in project.rules where rule.canToggle {
+                let isOn = currentRuleState(for: rule) == true
+                guard isOn else { continue }
+                do {
+                    try setRuleState(false, rule: rule)
+                    report.rulesReverted += 1
+                    patchLog("Auto-restore: reverted rule \(rule.relativePath) in \(projectName)")
+                } catch let error as PatchPackageError {
+                    let msg = "\(error.localizationKey)\(error.localizationArgument.map { ": \($0)" } ?? "")"
+                    report.failures.append((projectName: projectName, reason: "rule \(rule.relativePath): \(msg)"))
+                    patchLogError("Auto-restore: rule revert failed for \(projectName) — \(msg)")
+                } catch {
+                    report.failures.append((projectName: projectName, reason: "rule \(rule.relativePath): \(error.localizedDescription)"))
+                    patchLogError("Auto-restore: rule revert failed for \(projectName) — \(error.localizedDescription)")
+                }
+            }
+        }
+
+        patchLog("Auto-restore: done — \(report.transactionsRestored) transaction(s), \(report.rulesReverted) rule(s), \(report.failures.count) failure(s), \(report.skipped) skipped")
+        AppLog.shared.append("[license] auto-restore: \(report.transactionsRestored) txn, \(report.rulesReverted) rule(s) reverted across \(report.projectsScanned) project(s)")
+        if !report.failures.isEmpty {
+            for f in report.failures {
+                AppLog.shared.append("[license] auto-restore FAIL \(f.projectName): \(f.reason)")
+            }
+        }
+        return report
+    }
+
     private static func orderedBundleIdentifiers(in project: PatchProject) -> [String] {
         project.allBundleIdentifiers
     }

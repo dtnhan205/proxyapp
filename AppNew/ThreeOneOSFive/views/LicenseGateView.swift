@@ -297,6 +297,17 @@ struct LicenseGateView: View {
                 }
             } catch let err as LicenseKeyError {
                 await MainActor.run {
+                    // Key invalid khi user nhập key mới (key cũ còn cache) →
+                    // revert mọi patch đang apply trước khi thử khóa lại.
+                    // Bám sát logic RootView: bất kỳ LicenseKeyError nào
+                    // (trừ internalError / missingKey / invalidResponse là
+                    // lỗi mạng) đều nghĩa là key cũ không còn dùng được.
+                    // Chạy detached để không block main thread khi revert.
+                    if !Self.isTransientKeyError(err) {
+                        Task.detached(priority: .userInitiated) {
+                            DevicePatchService.restoreAllAppliedPatches()
+                        }
+                    }
                     // Build bị revoke/unknown → bật overlay (RootView sẽ phủ).
                     // Không cho phép nhập lại key khác để bypass; user buộc
                     // phải cập nhật app.
@@ -331,5 +342,21 @@ struct LicenseGateView: View {
     private func exitApp(reason: String) {
         NSLog("[LicenseGate] exit: \(reason)")
         exit(0)
+    }
+
+    /// Phân biệt lỗi "key thật sự không hợp lệ" (cần revert patch) với
+    /// lỗi tạm thời (mất mạng / server lỗi / key rỗng). Lỗi tạm thời
+    /// KHÔNG revert — chưa chắc key invalid, chỉ là request thất bại.
+    /// Nếu revert nhầm khi mạng chập chờn, user sẽ mất quyền dùng patch
+    /// cho đến khi nhập lại key dù key vẫn còn hạn.
+    private static func isTransientKeyError(_ error: LicenseKeyError) -> Bool {
+        switch error {
+        case .internalError, .missingKey, .invalidResponse:
+            return true
+        case .keyNotFound, .revoked, .expired, .notActivated,
+             .deviceLimitReached, .deviceNotBound,
+             .buildMissing, .buildRevoked, .buildUnknown:
+            return false
+        }
     }
 }

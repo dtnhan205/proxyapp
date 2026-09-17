@@ -562,16 +562,33 @@ enum PatchHubService {
         guard let http = response as? HTTPURLResponse else {
             throw LicenseKeyError.invalidResponse
         }
-        // Server may return non-2xx with a JSON body containing `reason`; decode
-        // the body in any case so we surface the real failure to the caller.
-        let decoded = (try? JSONDecoder().decode(RemoteKeyStatus.self, from: data))
+        // Server mới (commit 79d4b3c) trả response dạng envelope đã ký
+        // { data: {...}, signature: "BASE64" }. `SignedResponse.verifyAndDecode`
+        // vừa verify chữ ký RSA-SHA256 vừa decode inner `data` thành
+        // `RemoteKeyStatus`. Nếu verify fail (key bị rotate, server fake,
+        // envelope sai cấu trúc) → throw `.invalidResponse` để caller hiển
+        // thị "Phản hồi từ máy chủ không hợp lệ" như cũ.
+        let decoded: RemoteKeyStatus
+        do {
+            decoded = try SignedResponse.verifyAndDecode(RemoteKeyStatus.self, from: data)
+        } catch {
+            // Fallback cho server cũ chưa bật ký: thử decode JSON thuần.
+            // `verifyAndDecode` đã làm điều này internally khi envelope
+            // không có field `signature`; nếu vẫn fail thì đây là response
+            // thật sự malformed.
+            if let fallback = try? JSONDecoder().decode(RemoteKeyStatus.self, from: data) {
+                decoded = fallback
+            } else {
+                throw LicenseKeyError.invalidResponse
+            }
+        }
         if (200...299).contains(http.statusCode) {
-            if let decoded, decoded.ok {
+            if decoded.ok {
                 return decoded
             }
             throw LicenseKeyError.invalidResponse
         }
-        let reason = decoded?.reason ?? defaultReason
+        let reason = decoded.reason ?? defaultReason
         throw mapReason(reason, decoded: decoded)
     }
 

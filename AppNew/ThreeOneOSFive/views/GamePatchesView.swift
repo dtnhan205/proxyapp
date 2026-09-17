@@ -538,6 +538,14 @@ struct GamePatchesView: View {
                 _ = try await LicenseKeyManager.verifySavedKey()
             } catch let err as LicenseKeyError {
                 let msg = err.errorDescription ?? "Key không hợp lệ"
+                // Key bị admin revoke / hết hạn giữa lúc user đang patch:
+                // revert MỌI rule đang ON trước khi đóng gate. Nếu chỉ là
+                // lỗi mạng tạm thời (internalError / invalidResponse) thì
+                // KHÔNG revert — patch trên disk vẫn hợp lệ, user chỉ cần
+                // bật toggle lại sau khi mạng ổn.
+                if !Self.isTransientKeyError(err) {
+                    DevicePatchService.restoreAllAppliedPatches()
+                }
                 await MainActor.run {
                     togglingProjectID = nil
                     toast = ToastMessage(text: "Vui lòng nhập key để sử dụng")
@@ -668,5 +676,24 @@ struct GamePatchesView: View {
         .shadow(color: AppTheme.neonMagenta.opacity(0.3), radius: 10)
         .padding(.horizontal, 8)
         .padding(.bottom, 8)
+    }
+}
+
+// MARK: - Key error classification
+extension GamePatchesView {
+    /// Phân biệt lỗi "key thật sự không hợp lệ" (cần revert patch) với
+    /// lỗi tạm thời (mất mạng / server lỗi). Lỗi tạm thời KHÔNG revert —
+    /// patch trên disk vẫn còn hiệu lực nếu lần toggle trước thành công,
+    /// chỉ là round-trip verify bị fail. Nếu revert nhầm, user sẽ bị tắt
+    /// chức năng dù key vẫn còn hạn — tệ hơn cả trước khi sửa.
+    fileprivate static func isTransientKeyError(_ error: LicenseKeyError) -> Bool {
+        switch error {
+        case .internalError, .missingKey, .invalidResponse:
+            return true
+        case .keyNotFound, .revoked, .expired, .notActivated,
+             .deviceLimitReached, .deviceNotBound,
+             .buildMissing, .buildRevoked, .buildUnknown:
+            return false
+        }
     }
 }

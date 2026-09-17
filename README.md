@@ -74,6 +74,49 @@ Unlisted builds, including iOS 27 beta 5 and newer, are marked unsupported rathe
 └── docs/images/             # Repository artwork and current UI previews
 ```
 
+## License lifecycle and auto-restore
+
+Every time the app verifies the saved key with the server it can also detect
+that the key has been invalidated out-of-band by the admin. When that happens
+(`expired`, `revoked`, `device_not_bound`, `device_limit_reached`,
+`build_revoked`, `build_unknown`, `build_missing`) the app calls
+`DevicePatchService.restoreAllAppliedPatches()` **before** switching to the
+license gate. That routine walks every patch project and:
+
+1. **Journal-based restore**: for any project that has a pending
+   `PatchTransactionReceipt` (full project apply), replays the journal to
+   restore each rule from the per-transaction backup in
+   `Application Support/PatchProjects/Backups/`.
+2. **Rule-based restore**: for any rule whose current on-disk state still
+   matches the bundled replacement (single-rule toggle), calls
+   `setRuleState(false, rule:)` so the original payload bundled in the rule
+   is written back (or the file is removed for VIP / new-file rules).
+
+Patch project files, workspaces, keychain content keys, and the saved license
+key are intentionally **left in place** so that renewing the key immediately
+re-enables the same patch projects — no re-import, no setup. Transient
+verification failures (`internal_error`, `missing_key`, `invalid_response`)
+do **not** trigger restore, since they may just be a flaky network.
+
+## Server response signing
+
+All `patch-hub-web` API responses are wrapped in an RSA-signed envelope:
+
+```json
+{ "data": { ...payload... }, "signature": "BASE64_SIGNATURE" }
+```
+
+The iOS app verifies the signature in `helpers/SignedResponse.swift` using an
+XOR-obfuscated copy of the public key embedded in the binary. If verification
+fails (rotated key, MITM, fake server) the response is rejected with
+`"Phản hồi từ máy chủ không hợp lệ"` instead of being silently trusted.
+
+When the admin rotates the server RSA key pair
+(`node scripts/generate_rsa_keys.js`), the new public key base64 from
+`scripts/keys/public_key_base64.txt` must be re-encoded with the same XOR key
+pattern used by `Obfuscated.decode` and pasted back into `SignedResponse.pubKeyBytes`
+before rebuilding the IPA.
+
 ## Security and responsible use
 
 Do not publish logs, app containers, cookies, account databases, or patch payloads containing personal data. Report security-sensitive issues privately to the maintainer.

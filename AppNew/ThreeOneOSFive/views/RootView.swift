@@ -154,6 +154,18 @@ struct RootView: View {
                 }
             }
         } catch let error as LicenseKeyError {
+            // Key không còn hợp lệ (hết hạn / bị revoke / sai thiết bị /
+            // build bị admin revoke). Trước khi chuyển về gate, REVERT MỌI
+            // patch đang active trên disk về file gốc để:
+            //   - Tắt hoàn toàn chức năng patch (đúng yêu cầu "tự động tắt").
+            //   - Không để app rơi vào trạng thái nửa vời: file đã patch vẫn
+            //     nằm trên thiết bị nhưng key đã mất → rò rỉ nội dung.
+            //   - User gia hạn key → toggle sẽ tự apply lại từ cùng project.
+            // Chạy detached để không block main actor (nhiều project + file I/O).
+            Task.detached(priority: .userInitiated) {
+                DevicePatchService.restoreAllAppliedPatches()
+            }
+
             // Build bị revoke / unknown → bật overlay và KHÔNG clear key.
             // User vẫn thấy overlay kể cả khi restart app.
             switch error {
@@ -176,7 +188,9 @@ struct RootView: View {
                 }
             }
         } catch {
-            // Verify fail (lỗi kết nối hoặc lỗi server) — xoá key local, đẩy về gate.
+            // Verify fail (lỗi kết nối hoặc lỗi server) — KHÔNG revert patch
+            // (chưa chắc key invalid, chỉ là mất mạng). Vẫn xoá key local và
+            // đẩy về gate để user nhập lại — re-evaluate lần sau sẽ verify lại.
             await MainActor.run {
                 store.clear()
                 withAnimation(.easeInOut(duration: 0.25)) {

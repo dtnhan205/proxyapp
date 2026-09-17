@@ -75,6 +75,7 @@
 		3105N215 /* PatchHubService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3105N115; };
 		3105N216 /* PatchLogService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3105N116; };
 		3105N217 /* RemoteImageCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3105N117; };
+		3105N218 /* SignedResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3105N118; };
 		3105G200 /* ZIPArchiveWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3105G100; };
 		3105G201 /* FileOperationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3105G101; };
 		3105G202 /* ZIPArchiveExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3105G102; };
@@ -176,6 +177,7 @@
 		3105N115 /* PatchHubService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatchHubService.swift; sourceTree = "<group>"; };
 		3105N116 /* PatchLogService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatchLogService.swift; sourceTree = "<group>"; };
 		3105N117 /* RemoteImageCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteImageCache.swift; sourceTree = "<group>"; };
+		3105N118 /* SignedResponse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignedResponse.swift; sourceTree = "<group>"; };
 		3105G100 /* ZIPArchiveWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZIPArchiveWriter.swift; sourceTree = "<group>"; };
 		3105G101 /* FileOperationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileOperationCoordinator.swift; sourceTree = "<group>"; };
 		3105G102 /* ZIPArchiveExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZIPArchiveExtractor.swift; sourceTree = "<group>"; };
@@ -323,6 +325,7 @@
 				3105N115 /* PatchHubService.swift */,
 				3105N116 /* PatchLogService.swift */,
 				3105N117 /* RemoteImageCache.swift */,
+				3105N118 /* SignedResponse.swift */,
 			);
 			path = helpers;
 			sourceTree = "<group>";
@@ -481,6 +484,7 @@
 				3105N215,
 				3105N216,
 				3105N217,
+				3105N218,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
