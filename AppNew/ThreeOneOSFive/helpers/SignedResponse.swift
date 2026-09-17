@@ -101,45 +101,70 @@ enum SignedResponse {
         _ type: T.Type,
         from data: Data
     ) throws -> T {
+        NSLog("[SignedResponse] === verifyAndDecode start (data %d bytes) ===", data.count)
         // 1. Parse envelope thô để lấy signature + inner JSON string
-        let envelope = try JSONSerialization.jsonObject(with: data, options: [])
-        guard let dict = envelope as? [String: Any] else {
+        let envelope: Any
+        do {
+            envelope = try JSONSerialization.jsonObject(with: data, options: [])
+            NSLog("[SignedResponse] step 1 OK: envelope parsed")
+        } catch {
+            NSLog("[SignedResponse] step 1 FAIL: JSON parse error: %@", String(describing: error))
             throw SignedResponseError.malformedEnvelope
         }
+        guard let dict = envelope as? [String: Any] else {
+            NSLog("[SignedResponse] step 1 FAIL: envelope is not [String: Any], got %@", type(of: envelope))
+            throw SignedResponseError.malformedEnvelope
+        }
+        NSLog("[SignedResponse] step 1 OK: envelope keys = %@", dict.keys.joined(separator: ","))
 
         // Một số endpoint có thể vẫn trả JSON thuần (vd khi chưa bật ký).
         // Nếu top-level đã có field mong đợi của `T` mà KHÔNG có signature,
         // ta fallback decode trực tiếp để tránh break các API chưa migrate.
         if dict["signature"] == nil {
+            NSLog("[SignedResponse] step 1b: no signature field, trying plain JSON decode fallback")
             if let direct = try? JSONDecoder().decode(T.self, from: data) {
+                NSLog("[SignedResponse] step 1b OK: plain JSON decoded without signature")
                 return direct
             }
+            NSLog("[SignedResponse] step 1b FAIL: plain JSON decode also failed")
             throw SignedResponseError.signatureMissing
         }
 
-        guard let signatureString = dict["signature"] as? String,
-              let signatureData = Data(base64Encoded: signatureString) else {
+        guard let signatureString = dict["signature"] as? String else {
+            NSLog("[SignedResponse] step 2 FAIL: signature field is not a String, got %@", type(of: dict["signature"] ?? "nil"))
             throw SignedResponseError.signatureDecodeFailed
         }
+        guard let signatureData = Data(base64Encoded: signatureString) else {
+            NSLog("[SignedResponse] step 2 FAIL: signature not valid base64 (len=%d)", signatureString.count)
+            throw SignedResponseError.signatureDecodeFailed
+        }
+        NSLog("[SignedResponse] step 2 OK: signature decoded (%d bytes)", signatureData.count)
 
         let payload = dict["data"]
         guard payload != nil else {
+            NSLog("[SignedResponse] step 2 FAIL: data field is nil")
             throw SignedResponseError.malformedEnvelope
         }
+        NSLog("[SignedResponse] step 2 OK: data field present, type = %@", type(of: payload!))
 
         // 2. Re-canonical JSON cho đúng thứ tự key alphabet (giống server)
         let canonical = canonicalJSONString(payload)
         guard let canonicalData = canonical.data(using: .utf8) else {
+            NSLog("[SignedResponse] step 2 FAIL: canonical string → utf8 failed")
             throw SignedResponseError.malformedEnvelope
         }
+        NSLog("[SignedResponse] step 2 OK: canonical (%d bytes): %@", canonicalData.count, String(data: canonicalData, encoding: .utf8) ?? "<n/a>")
 
         // 3. Verify RSA-SHA256 PKCS#1 v1.5 bằng public key embed
         guard let publicKey = loadPublicKey() else {
-            // Không có public key (lỗi build/import) → KHÔNG được bypass.
-            // Throw mismatch để caller fail sang invalidResponse, user biết
-            // ngay có vấn đề với binary chứ không âm thầm chấp nhận response.
+            // Public key không import được (SecKeyCreateWithData fail) —
+            // log rõ để debug xem binary có key khớp server không, hoặc
+            // thiết bị có support SPKI format không. Throw mismatch để
+            // caller fail sang invalidResponse cho user.
+            NSLog("[SignedResponse] step 3 FAIL: public key unavailable (SecKeyCreateWithData/SPKI failed)")
             throw SignedResponseError.signatureMismatch
         }
+        NSLog("[SignedResponse] step 3 OK: public key loaded, blockSize=%d", SecKeyGetBlockSize(publicKey))
 
         var verifyError: Unmanaged<CFError>?
         let isValid = SecKeyVerifySignature(
@@ -151,17 +176,34 @@ enum SignedResponse {
         )
         if !isValid {
             if let err = verifyError?.takeRetainedValue() {
-                NSLog("[SignedResponse] signature verify failed: %@", String(describing: err))
+                NSLog("[SignedResponse] step 3 FAIL: signature verify failed: %@", String(describing: err))
+            } else {
+                NSLog("[SignedResponse] step 3 FAIL: signature verify returned false (no error detail)")
             }
             throw SignedResponseError.signatureMismatch
         }
+        NSLog("[SignedResponse] step 3 OK: signature verified")
 
         // 4. Decode payload thành T
-        let payloadData = try JSONSerialization.data(
-            withJSONObject: payload,
-            options: [.sortedKeys] // tránh khác biệt key order khi parse
-        )
-        return try JSONDecoder().decode(T.self, from: payloadData)
+        let payloadData: Data
+        do {
+            payloadData = try JSONSerialization.data(
+                withJSONObject: payload,
+                options: [.sortedKeys] // tránh khác biệt key order khi parse
+            )
+        } catch {
+            NSLog("[SignedResponse] step 4 FAIL: re-serialize payload failed: %@", String(describing: error))
+            throw error
+        }
+        do {
+            let decoded = try JSONDecoder().decode(T.self, from: payloadData)
+            NSLog("[SignedResponse] step 4 OK: payload decoded as %@", String(describing: T.self))
+            NSLog("[SignedResponse] === verifyAndDecode success ===")
+            return decoded
+        } catch {
+            NSLog("[SignedResponse] step 4 FAIL: decode %@ failed: %@", String(describing: T.self), String(describing: error))
+            throw error
+        }
     }
 
     // MARK: - Public key loading

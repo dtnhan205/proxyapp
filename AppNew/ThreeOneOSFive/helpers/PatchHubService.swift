@@ -572,13 +572,18 @@ enum PatchHubService {
         do {
             decoded = try SignedResponse.verifyAndDecode(RemoteKeyStatus.self, from: data)
         } catch {
+            NSLog("[PatchHubService] verifyAndDecode failed: %@. HTTP=%d. Body (first 200): %@",
+                  String(describing: error), http.statusCode,
+                  String(data: data.prefix(200), encoding: .utf8) ?? "<binary>")
             // Fallback cho server cũ chưa bật ký: thử decode JSON thuần.
             // `verifyAndDecode` đã làm điều này internally khi envelope
             // không có field `signature`; nếu vẫn fail thì đây là response
             // thật sự malformed.
             if let fallback = try? JSONDecoder().decode(RemoteKeyStatus.self, from: data) {
+                NSLog("[PatchHubService] fallback plain JSON decode OK (server not signing?)")
                 decoded = fallback
             } else {
+                NSLog("[PatchHubService] fallback plain JSON decode also FAIL → throw invalidResponse")
                 throw LicenseKeyError.invalidResponse
             }
         }
@@ -586,6 +591,7 @@ enum PatchHubService {
             if decoded.ok {
                 return decoded
             }
+            NSLog("[PatchHubService] 2xx but ok=false, reason=%@", decoded.reason ?? "<nil>")
             throw LicenseKeyError.invalidResponse
         }
         let reason = decoded.reason ?? defaultReason
