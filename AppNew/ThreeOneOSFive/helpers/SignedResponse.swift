@@ -155,9 +155,7 @@ enum SignedResponse {
         }
         NSLog("[SignedResponse] step 2 OK: canonical (%d bytes): %@", canonicalData.count, String(data: canonicalData, encoding: .utf8) ?? "<n/a>")
         NSLog("[SignedResponse] step 2 DEBUG canonical hex prefix: %@", canonicalData.prefix(60).map { String(format: "%02x", $0) }.joined())
-        NSLog("[SignedResponse] step 2 DEBUG raw payload type=%@ desc=%@",
-              String(describing: type(of: payloadNonOpt)),
-              String(describing: payloadNonOpt).prefix(200))
+        NSLog("[SignedResponse] step 2 DEBUG raw payload desc=%@", String(describing: payloadNonOpt).prefix(200))
 
         // 3. Verify RSA-SHA256 PKCS#1 v1.5 bằng public key embed
         guard let publicKey = loadPublicKey() else {
