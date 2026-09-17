@@ -113,9 +113,12 @@ fails (rotated key, MITM, fake server) the response is rejected with
 
 When the admin rotates the server RSA key pair
 (`node scripts/generate_rsa_keys.js`), the new public key base64 from
-`scripts/keys/public_key_base64.txt` must be re-encoded with the same XOR key
-pattern used by `Obfuscated.decode` and pasted back into `SignedResponse.pubKeyBytes`
-before rebuilding the IPA.
+`scripts/keys/public_key_base64.txt` must be re-encoded with the same
+**cycle-XOR** pattern (`bytes[i] XOR key[i % key.count]`) used by
+`SignedResponse.xorDecode` and pasted back into `SignedResponse.pubKeyBytes`
+before rebuilding the IPA. (We can't reuse `Obfuscated.decode` here because
+that helper enforces `bytes.count == key.count`, which would crash the app
+when the 392-byte public-key blob is decoded with a 32-byte XOR key.)
 
 ## Security and responsible use
 

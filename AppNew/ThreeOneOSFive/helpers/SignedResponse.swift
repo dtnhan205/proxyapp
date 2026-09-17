@@ -34,6 +34,19 @@ enum SignedResponse {
 
     // MARK: - Obfuscated RSA public key (Base64 SPKI, RSA-2048)
     // bytes[i] XOR pubKeyXorKey[i % 32] = ASCII(Base64 của public key)
+    //
+    // LƯU Ý QUAN TRỌNG: KHÔNG dùng `Obfuscated.decode(pubKeyBytes, key:)`
+    // vì helper đó có `precondition(bytes.count == key.count)` — sẽ CRASH
+    // app khi build public key lần đầu. Public key base64 dài 392 ký tự
+    // nhưng key XOR chỉ 32 byte. Ta tự XOR-cycle thay vì dùng helper.
+    private static func xorDecode(_ bytes: [UInt8], key: [UInt8]) -> String {
+        precondition(!key.isEmpty, "xor key must not be empty")
+        var out = [UInt8](repeating: 0, count: bytes.count)
+        for i in 0..<bytes.count {
+            out[i] = bytes[i] ^ key[i % key.count]
+        }
+        return String(bytes: out, encoding: .utf8) ?? ""
+    }
     private static let pubKeyBytes: [UInt8] = [
         0xEA, 0x12, 0x77, 0xD3, 0x85, 0x25, 0x53, 0xC6, 0x91, 0x60, 0x37, 0x95, 0xF3, 0x5D, 0x18, 0x8F,
         0x13, 0x82, 0x58, 0xF6, 0x5C, 0xD3, 0x02, 0xAF, 0x1B, 0x4D, 0xD0, 0x70, 0x2F, 0x90, 0x8A, 0xC9,
@@ -163,8 +176,9 @@ enum SignedResponse {
     }
 
     private static func buildPublicKey() -> SecKey? {
-        // 1. XOR-decrypt base64
-        let base64 = Obfuscated.decode(pubKeyBytes, key: pubKeyXorKey)
+        // 1. XOR-decrypt base64 (cycle key, do KHÔNG dùng Obfuscated.decode
+        //    — nó có precondition bytes.count == key.count sẽ crash ở đây)
+        let base64 = xorDecode(pubKeyBytes, key: pubKeyXorKey)
 
         // 2. Base64 → DER bytes (SPKI format, RSA-2048)
         guard let der = Data(base64Encoded: base64) else {
