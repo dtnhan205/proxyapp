@@ -67,9 +67,18 @@ enum LicenseKeyError: Error, LocalizedError {
     case buildRevoked
     case buildUnknown
 
+    /// DEBUG: lưu chi tiết lỗi mới nhất để hiển thị trên UI khi gặp
+    /// invalidResponse. Tạm thời — sẽ xoá sau khi debug xong.
+    static var lastDebugDetail: String = ""
+
     var errorDescription: String? {
         switch self {
-        case .invalidResponse: return "Phản hồi từ máy chủ không hợp lệ"
+        case .invalidResponse:
+            // DEBUG MODE: append chi tiết lỗi để user chụp ảnh gửi.
+            if !Self.lastDebugDetail.isEmpty {
+                return "Phản hồi từ máy chủ không hợp lệ\n\n[DEBUG]\n\(Self.lastDebugDetail)"
+            }
+            return "Phản hồi từ máy chủ không hợp lệ"
         case .keyNotFound: return "Key không tồn tại. Vui lòng kiểm tra lại"
         case .revoked: return "Key đã bị khoá. Vui lòng liên hệ admin"
         case .expired: return "Key đã hết hạn. Vui lòng gia hạn"
@@ -560,6 +569,7 @@ enum PatchHubService {
         defaultReason: String
     ) throws -> RemoteKeyStatus {
         guard let http = response as? HTTPURLResponse else {
+            LicenseKeyError.lastDebugDetail = "Response not HTTPURLResponse"
             throw LicenseKeyError.invalidResponse
         }
         // Server mới (commit 79d4b3c) trả response dạng envelope đã ký
@@ -572,9 +582,9 @@ enum PatchHubService {
         do {
             decoded = try SignedResponse.verifyAndDecode(RemoteKeyStatus.self, from: data)
         } catch {
-            NSLog("[PatchHubService] verifyAndDecode failed: %@. HTTP=%d. Body (first 200): %@",
-                  String(describing: error), http.statusCode,
-                  String(data: data.prefix(200), encoding: .utf8) ?? "<binary>")
+            let bodyPreview = String(data: data.prefix(400), encoding: .utf8) ?? "<binary>"
+            NSLog("[PatchHubService] verifyAndDecode failed: %@. HTTP=%d. Body: %@",
+                  String(describing: error), http.statusCode, bodyPreview)
             // Fallback cho server cũ chưa bật ký: thử decode JSON thuần.
             // `verifyAndDecode` đã làm điều này internally khi envelope
             // không có field `signature`; nếu vẫn fail thì đây là response
@@ -584,6 +594,7 @@ enum PatchHubService {
                 decoded = fallback
             } else {
                 NSLog("[PatchHubService] fallback plain JSON decode also FAIL → throw invalidResponse")
+                LicenseKeyError.lastDebugDetail = "HTTP=\(http.statusCode)\n\(error)\nBody: \(bodyPreview)"
                 throw LicenseKeyError.invalidResponse
             }
         }
@@ -592,6 +603,7 @@ enum PatchHubService {
                 return decoded
             }
             NSLog("[PatchHubService] 2xx but ok=false, reason=%@", decoded.reason ?? "<nil>")
+            LicenseKeyError.lastDebugDetail = "HTTP=\(http.statusCode) ok=false reason=\(decoded.reason ?? "<nil>")"
             throw LicenseKeyError.invalidResponse
         }
         let reason = decoded.reason ?? defaultReason
