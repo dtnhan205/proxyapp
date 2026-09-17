@@ -208,12 +208,7 @@ enum SignedResponse {
         }
 
         if !isValid {
-            if let err = verifyError?.takeRetainedValue() {
-                NSLog("[SignedResponse] step 3 FAIL: tried %d canonical forms, all miss. Last err: %@",
-                      tried, String(describing: err))
-            } else {
-                NSLog("[SignedResponse] step 3 FAIL: tried %d canonical forms, all miss (no error detail)", tried)
-            }
+            NSLog("[SignedResponse] step 3 FAIL: tried %d canonical forms, all miss", tried)
             throw SignedResponseError.signatureMismatch
         }
         NSLog("[SignedResponse] step 3 OK: signature verified")
