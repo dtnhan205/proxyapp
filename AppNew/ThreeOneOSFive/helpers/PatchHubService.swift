@@ -594,7 +594,7 @@ enum PatchHubService {
                 decoded = fallback
             } else {
                 NSLog("[PatchHubService] fallback plain JSON decode also FAIL → throw invalidResponse")
-                LicenseKeyError.lastDebugDetail = "HTTP=\(http.statusCode)\n\(error)\nBody: \(bodyPreview)"
+                LicenseKeyError.lastDebugDetail = "HTTP=\(http.statusCode)\nError: \(error)\nBody: \(bodyPreview)"
                 throw LicenseKeyError.invalidResponse
             }
         }

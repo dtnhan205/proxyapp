@@ -154,6 +154,10 @@ enum SignedResponse {
             throw SignedResponseError.malformedEnvelope
         }
         NSLog("[SignedResponse] step 2 OK: canonical (%d bytes): %@", canonicalData.count, String(data: canonicalData, encoding: .utf8) ?? "<n/a>")
+        NSLog("[SignedResponse] step 2 DEBUG canonical hex prefix: %@", canonicalData.prefix(60).map { String(format: "%02x", $0) }.joined())
+        NSLog("[SignedResponse] step 2 DEBUG raw payload type=%@ desc=%@",
+              String(describing: type(of: payloadNonOpt)),
+              String(describing: payloadNonOpt).prefix(200))
 
         // 3. Verify RSA-SHA256 PKCS#1 v1.5 bằng public key embed
         guard let publicKey = loadPublicKey() else {
@@ -167,18 +171,50 @@ enum SignedResponse {
         NSLog("[SignedResponse] step 3 OK: public key loaded, blockSize=%d", SecKeyGetBlockSize(publicKey))
 
         var verifyError: Unmanaged<CFError>?
-        let isValid = SecKeyVerifySignature(
-            publicKey,
-            .rsaSignatureMessagePKCS1v15SHA256,
-            canonicalData as CFData,
-            signatureData as CFData,
-            &verifyError
-        )
+        // Thử nhiều kiểu canonical khác nhau để chịu được cả server dùng
+        // JCS RFC 8785 lẫn server custom stringify. Log ra để biết server
+        // đang dùng kiểu nào.
+        var tried = 0
+        var isValid = false
+
+        // Helper inline để tránh goto (Swift không có).
+        func tryVerify(_ data: Data, label: String) -> Bool {
+            tried += 1
+            let ok = SecKeyVerifySignature(
+                publicKey,
+                .rsaSignatureMessagePKCS1v15SHA256,
+                data as CFData,
+                signatureData as CFData,
+                nil
+            )
+            NSLog("[SignedResponse] step 3 try %d (%@, %d bytes) → %@",
+                  tried, label, data.count, ok ? "MATCH" : "miss")
+            return ok
+        }
+
+        // A) Custom canonical (sorted keys, unicode-safe)
+        isValid = tryVerify(canonicalData, label: "custom canonical")
+        if !isValid,
+           // B) JSONSerialization sortedKeys
+           let alt = try? JSONSerialization.data(
+               withJSONObject: payloadNonOpt,
+               options: [.sortedKeys, .withoutEscapingSlashes]
+           ) {
+            isValid = tryVerify(alt, label: "sortedKeys")
+        }
+        if !isValid,
+           // C) raw inner string
+           let rawInner = payloadNonOpt as? String,
+           let rawInnerData = rawInner.data(using: .utf8) {
+            isValid = tryVerify(rawInnerData, label: "raw inner string")
+        }
+
         if !isValid {
             if let err = verifyError?.takeRetainedValue() {
-                NSLog("[SignedResponse] step 3 FAIL: signature verify failed: %@", String(describing: err))
+                NSLog("[SignedResponse] step 3 FAIL: tried %d canonical forms, all miss. Last err: %@",
+                      tried, String(describing: err))
             } else {
-                NSLog("[SignedResponse] step 3 FAIL: signature verify returned false (no error detail)")
+                NSLog("[SignedResponse] step 3 FAIL: tried %d canonical forms, all miss (no error detail)", tried)
             }
             throw SignedResponseError.signatureMismatch
         }
