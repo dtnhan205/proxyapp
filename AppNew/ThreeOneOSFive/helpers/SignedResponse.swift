@@ -112,7 +112,7 @@ enum SignedResponse {
             throw SignedResponseError.malformedEnvelope
         }
         guard let dict = envelope as? [String: Any] else {
-            NSLog("[SignedResponse] step 1 FAIL: envelope is not [String: Any], got %@", String(describing: type(of: envelope)))
+            NSLog("[SignedResponse] step 1 FAIL: envelope is not [String: Any]")
             throw SignedResponseError.malformedEnvelope
         }
         NSLog("[SignedResponse] step 1 OK: envelope keys = %@", dict.keys.joined(separator: ","))
@@ -131,7 +131,7 @@ enum SignedResponse {
         }
 
         guard let signatureString = dict["signature"] as? String else {
-            NSLog("[SignedResponse] step 2 FAIL: signature field is not a String, got %@", String(describing: type(of: dict["signature"] ?? "nil")))
+            NSLog("[SignedResponse] step 2 FAIL: signature field is not a String")
             throw SignedResponseError.signatureDecodeFailed
         }
         guard let signatureData = Data(base64Encoded: signatureString) else {
@@ -145,7 +145,7 @@ enum SignedResponse {
             NSLog("[SignedResponse] step 2 FAIL: data field is nil")
             throw SignedResponseError.malformedEnvelope
         }
-        NSLog("[SignedResponse] step 2 OK: data field present, type = %@", String(describing: type(of: payloadNonOpt)))
+        NSLog("[SignedResponse] step 2 OK: data field present")
 
         // 2. Re-canonical JSON cho đúng thứ tự key alphabet (giống server)
         let canonical = canonicalJSONString(payloadNonOpt)
