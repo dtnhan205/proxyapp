@@ -155,7 +155,7 @@ enum SignedResponse {
         }
         NSLog("[SignedResponse] step 2 OK: canonical (%d bytes): %@", canonicalData.count, String(data: canonicalData, encoding: .utf8) ?? "<n/a>")
         NSLog("[SignedResponse] step 2 DEBUG canonical hex prefix: %@", canonicalData.prefix(60).map { String(format: "%02x", $0) }.joined())
-        NSLog("[SignedResponse] step 2 DEBUG raw payload desc=%@", String(describing: payloadNonOpt).prefix(200))
+        NSLog("[SignedResponse] step 2 DEBUG raw payload desc=%@", String(String(describing: payloadNonOpt).prefix(200)) as NSString)
 
         // 3. Verify RSA-SHA256 PKCS#1 v1.5 bằng public key embed
         guard let publicKey = loadPublicKey() else {
@@ -168,7 +168,7 @@ enum SignedResponse {
         }
         NSLog("[SignedResponse] step 3 OK: public key loaded, blockSize=%d", SecKeyGetBlockSize(publicKey))
 
-        var verifyError: Unmanaged<CFError>?
+        let verifyError: Unmanaged<CFError>?
         // Thử nhiều kiểu canonical khác nhau để chịu được cả server dùng
         // JCS RFC 8785 lẫn server custom stringify. Log ra để biết server
         // đang dùng kiểu nào.
