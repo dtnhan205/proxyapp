@@ -8,6 +8,21 @@ enum PatchPackageCodec {
     static let latestSchemaVersion = 3
     private static let minimumSchemaVersion = 1
 
+    // MARK: - Default Server Patch Password (Obfuscated)
+    // Server mặc định đặt mật khẩu cho mọi file patch là TheNhanDevProxyVN.
+    // Mật khẩu được lưu dưới dạng byte XOR để chống dò tìm chuỗi (strings analysis) trên IPA.
+    private static let defaultPasswordBytes: [UInt8] = [
+        0x6E, 0xF7, 0x71, 0x9C, 0x13, 0xE9, 0x6B, 0xBA,
+        0x44, 0x11, 0xE0, 0x6C, 0xAC, 0x32, 0xEB, 0x03, 0xA5
+    ]
+    private static let defaultPasswordKey: [UInt8] = [
+        0x3A, 0x9F, 0x14, 0xD2, 0x7B, 0x88, 0x05, 0xFE,
+        0x21, 0x67, 0xB0, 0x1E, 0xC3, 0x4A, 0x92, 0x55, 0xEB
+    ]
+    static var defaultServerPassword: String {
+        Obfuscated.decode(defaultPasswordBytes, key: defaultPasswordKey)
+    }
+
     private struct Envelope: Codable {
         let schemaVersion: Int
         let keyAADVersion: Int?

@@ -157,7 +157,17 @@ enum DevicePatchService {
 
             // 2) Revert từng rule đang ON (toggle-based patches — không có backup riêng,
             //    nhưng rule đã bundle sẵn originalData nên có thể revert an toàn).
-            guard let project = item.project else {
+            var project = item.project
+            if project == nil {
+                if let data = try? PatchProjectLibrary.readPackage(at: item.packageURL) {
+                    if item.summary.isPasswordProtected {
+                        project = (try? PatchPackageCodec.decode(data, password: PatchPackageCodec.defaultServerPassword))?.project
+                    } else {
+                        project = (try? PatchPackageCodec.decode(data, password: nil))?.project
+                    }
+                }
+            }
+            guard let project else {
                 report.skipped += 1
                 continue
             }

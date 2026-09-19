@@ -171,6 +171,12 @@ final class PatchProjectStore: ObservableObject {
         guard item.isLocked, !isBusy else { return }
         do {
             let data = try PatchProjectLibrary.readPackage(at: item.packageURL)
+            // Tự động thử giải mã với mật khẩu mặc định của server trước
+            if let decoded = try? PatchPackageCodec.decode(data, password: PatchPackageCodec.defaultServerPassword) {
+                try? PatchKeyStore.store(decoded.contentKey, for: item.summary)
+                reload()
+                return
+            }
             pendingUnlock = PendingUnlock(data: data, summary: item.summary, existingURL: item.packageURL)
             passwordRequest = PatchPasswordRequest(summary: item.summary)
         } catch let error as PatchPackageError {
@@ -288,7 +294,7 @@ final class PatchProjectStore: ObservableObject {
         summary: PatchPackageSummary,
         existingURL: URL?
     ) throws -> PendingUnlock? {
-        if let key = try PatchKeyStore.load(for: summary) {
+        if let key = try? PatchKeyStore.load(for: summary) {
             let decoded = try PatchPackageCodec.decode(data, contentKey: key)
             try PatchProjectLibrary.installImportedPackage(
                 data: data,
@@ -299,6 +305,17 @@ final class PatchProjectStore: ObservableObject {
             return nil
         }
         if summary.isPasswordProtected {
+            // Tự động thử giải mã với mật khẩu mặc định của server trước
+            if let decoded = try? PatchPackageCodec.decode(data, password: PatchPackageCodec.defaultServerPassword) {
+                try? PatchKeyStore.store(decoded.contentKey, for: summary)
+                try PatchProjectLibrary.installImportedPackage(
+                    data: data,
+                    decoded: decoded,
+                    summary: summary,
+                    existingURL: existingURL
+                )
+                return nil
+            }
             return PendingUnlock(data: data, summary: summary, existingURL: existingURL)
         }
         let decoded = try PatchPackageCodec.decode(data, password: nil)

@@ -38,7 +38,22 @@ enum PatchProjectLibrary {
         return root
     }
 
+    static func purgeInsecureWorkspaceFolder(fileManager: FileManager = .default) {
+        if let docs = try? fileManager.url(
+            for: .documentDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: false
+        ) {
+            let patchesDir = docs.appendingPathComponent("Patches", isDirectory: true)
+            if fileManager.fileExists(atPath: patchesDir.path) {
+                try? fileManager.removeItem(at: patchesDir)
+            }
+        }
+    }
+
     static func load(fileManager: FileManager = .default) -> [PatchLibraryItem] {
+        purgeInsecureWorkspaceFolder(fileManager: fileManager)
         guard let root = try? packageRootURL(fileManager: fileManager),
               let urls = try? fileManager.contentsOfDirectory(
                 at: root,
@@ -52,12 +67,11 @@ enum PatchProjectLibrary {
                 let data = try readPackage(at: url)
                 let summary = try PatchPackageCodec.inspect(data)
                 let decoded: DecodedPatchPackage?
-                if let contentKey = try PatchKeyStore.load(for: summary) {
-                    decoded = try PatchPackageCodec.decode(data, contentKey: contentKey)
-                } else if summary.isPasswordProtected {
+                if summary.isPasswordProtected {
+                    // Không giải mã khi tải danh sách, chỉ giải mã on-demand khi bật chức năng
                     decoded = nil
                 } else {
-                    decoded = try PatchPackageCodec.decode(data, password: nil)
+                    decoded = try? PatchPackageCodec.decode(data, password: nil)
                 }
                 let item = PatchLibraryItem(
                     summary: summary,
@@ -65,13 +79,6 @@ enum PatchProjectLibrary {
                     contentKey: decoded?.contentKey,
                     packageURL: url
                 )
-                if summary.schemaVersion >= 2, let project = decoded?.project {
-                    do {
-                        _ = try PatchWorkspaceService.ensureWorkspace(for: project)
-                    } catch {
-                        log("patch: workspace unavailable for \(project.id.uuidString)")
-                    }
-                }
                 byID[summary.packageID] = item
             } catch {
                 log("patch: skipped invalid local package \(url.lastPathComponent)")
@@ -132,17 +139,7 @@ enum PatchProjectLibrary {
                 existingURL: existingURL,
                 fileManager: fileManager
             )
-            if summary.schemaVersion >= 2 {
-                _ = try PatchWorkspaceService.replaceWorkspace(
-                    with: decoded.project,
-                    fileManager: fileManager
-                )
-            } else {
-                try? PatchWorkspaceService.deleteWorkspace(
-                    projectID: decoded.project.id,
-                    fileManager: fileManager
-                )
-            }
+            // Không trích xuất dữ liệu ra thư mục Documents/Patches để bảo mật, chống ăn trộm file patch
         } catch {
             if let previousData, let existingURL {
                 try? previousData.write(

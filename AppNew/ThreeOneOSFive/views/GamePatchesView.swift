@@ -33,6 +33,19 @@ struct GamePatchesView: View {
     @AppStorage("patch.gameAssignments") private var gameAssignmentsRaw = "{}"
     @AppStorage("patch.remoteToLocalMap") private var remoteToLocalMapRaw = "{}"
     @AppStorage("patch.remotePatchNames") private var remotePatchNamesRaw = "{}"
+    @AppStorage("patch.activeProjectStates") private var activeProjectStatesRaw = "{}"
+
+    private var activeProjectStates: [String: Bool] {
+        (try? JSONDecoder().decode([String: Bool].self, from: Data(activeProjectStatesRaw.utf8))) ?? [:]
+    }
+
+    private func saveProjectState(id: UUID, isOn: Bool) {
+        var states = activeProjectStates
+        states[id.uuidString] = isOn
+        if let data = try? JSONEncoder().encode(states), let json = String(data: data, encoding: .utf8) {
+            activeProjectStatesRaw = json
+        }
+    }
 
     /// Maps both local packageID -> server project name and serverID -> server project name,
     /// ensuring patches always display the project name from the server instead of the 3105 file name.
@@ -305,19 +318,10 @@ struct GamePatchesView: View {
 
     @ViewBuilder
     private func itemRow(_ item: PatchLibraryItem, colorIndex: Int) -> some View {
-        if item.isLocked {
-            Button { store.requestUnlock(for: item) } label: {
-                toggleRow(item, colorIndex: colorIndex)
-            }
-            .buttonStyle(.plain)
-        } else {
-            toggleRow(item, colorIndex: colorIndex)
-        }
+        toggleRow(item, colorIndex: colorIndex)
     }
 
     private func toggleRow(_ item: PatchLibraryItem, colorIndex: Int) -> some View {
-        let rules = item.project?.rules ?? []
-        let toggleableCount = rules.filter(\.canToggle).count
         let rowColor = AppTheme.rowColor(colorIndex)
 
         return HStack(spacing: 12) {
@@ -344,7 +348,7 @@ struct GamePatchesView: View {
                 Text(displayName(for: item))
                     .font(.body.weight(.semibold))
                     .foregroundStyle(.primary)
-                NeonShimmerBar(count: rules.count, tint: rowColor)
+                NeonShimmerBar(count: item.project?.rules.count ?? 1, tint: rowColor)
                     .padding(.top, 2)
             }
             Spacer()
@@ -355,7 +359,7 @@ struct GamePatchesView: View {
                 Toggle("", isOn: projectToggleBinding(for: item))
                     .labelsHidden()
                     .neonToggleTint(rowColor)
-                    .disabled(!hasValidKey || toggleableCount == 0)
+                    .disabled(!hasValidKey)
             }
         }
         .padding(.vertical, 10)
@@ -448,6 +452,7 @@ struct GamePatchesView: View {
                     do {
                         let data = try PatchProjectLibrary.readPackage(at: fileURL)
                         let summary = try PatchPackageCodec.inspect(data)
+                        // Không giải mã khi tải về — giữ nguyên file mã hóa .3105
                         _ = try PatchProjectLibrary.save(data: data, projectName: item.name)
                         try? FileManager.default.removeItem(at: fileURL)
                         return summary.packageID.uuidString
@@ -486,29 +491,19 @@ struct GamePatchesView: View {
         }
     }
 
-    /// A patch's toggle reflects every toggle-capable rule in it at once: on only when all of
-    /// them currently show their replacement active on disk, off otherwise (including "never
-    /// applied yet"). Rules without a bundled original are skipped — they simply can't report
-    /// or accept an "off" state.
+    /// Khôi phục trạng thái bật/tắt của các chức năng từ bộ nhớ đã lưu
+    /// mà không cần giải mã trước tất cả các file patch.
     private func loadProjectStates() async {
-        let currentItems = items
-        guard !currentItems.isEmpty else { return }
-        let states: [UUID: Bool] = await Task.detached(priority: .userInitiated) {
-            var result: [UUID: Bool] = [:]
-            for item in currentItems {
-                let toggleableRules = (item.project?.rules ?? []).filter(\.canToggle)
-                guard !toggleableRules.isEmpty else { continue }
-                let allOn = toggleableRules.allSatisfy { DevicePatchService.currentRuleState(for: $0) == true }
-                result[item.id] = allOn
-            }
-            return result
-        }.value
-        projectStates = states
+        let saved = activeProjectStates
+        var result: [UUID: Bool] = [:]
+        for item in items {
+            result[item.id] = saved[item.id.uuidString] ?? false
+        }
+        projectStates = result
     }
 
     private func setProjectState(_ isOn: Bool, item: PatchLibraryItem) {
-        let toggleableRules = (item.project?.rules ?? []).filter(\.canToggle)
-        guard !toggleableRules.isEmpty, togglingProjectID == nil else { return }
+        guard togglingProjectID == nil else { return }
 
         // License gate: every toggle verifies the saved key with the server
         // before touching the filesystem. A revoked / expired / missing key
@@ -561,6 +556,44 @@ struct GamePatchesView: View {
                 return
             }
 
+            // ON-DEMAND DECRYPTION: Chỉ giải mã file của đúng chức năng này khi bật/tắt
+            let project: PatchProject
+            do {
+                let data = try PatchProjectLibrary.readPackage(at: item.packageURL)
+                let decoded: DecodedPatchPackage
+                if item.summary.isPasswordProtected {
+                    decoded = try PatchPackageCodec.decode(data, password: PatchPackageCodec.defaultServerPassword)
+                } else {
+                    decoded = try PatchPackageCodec.decode(data, password: nil)
+                }
+                project = decoded.project
+            } catch let error as PatchPackageError {
+                await MainActor.run {
+                    togglingProjectID = nil
+                    store.alert = PatchStoreAlert(
+                        titleKey: "common.failed",
+                        messageKey: error.localizationKey,
+                        messageArgument: error.localizationArgument
+                    )
+                }
+                return
+            } catch {
+                await MainActor.run {
+                    togglingProjectID = nil
+                    store.alert = PatchStoreAlert(
+                        titleKey: "common.failed",
+                        messageKey: "patch.error.wrong_password"
+                    )
+                }
+                return
+            }
+
+            let toggleableRules = project.rules.filter(\.canToggle)
+            guard !toggleableRules.isEmpty else {
+                await MainActor.run { togglingProjectID = nil }
+                return
+            }
+
             var failure: PatchPackageError?
             for rule in toggleableRules {
                 do {
@@ -582,6 +615,7 @@ struct GamePatchesView: View {
             await MainActor.run {
                 togglingProjectID = nil
                 projectStates[item.id] = actualState
+                saveProjectState(id: item.id, isOn: actualState)
                 if let capturedFailure {
                     store.alert = PatchStoreAlert(
                         titleKey: "common.failed",
