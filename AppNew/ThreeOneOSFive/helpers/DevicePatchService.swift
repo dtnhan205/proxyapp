@@ -233,6 +233,11 @@ enum DevicePatchService {
     /// Gửi Key + HWID lên Server https://serveripa.proxyvip.click/api/keys/session-token
     /// Server xác thực, lưu MongoDB, cấp Chữ Ký Số + TokenSeed 32-bit (chống crack HEX)
     /// Ghi đè file token.json vào Documents của Free Fire (TH & MAX), hạn 15 phút.
+    /// Ghi token.json ra 4 vị trí ưu tiên:
+    ///   1. Container Documents của game (trực tiếp)
+    ///   2. App Group shared container → game đọc được trên NON-JAILBREAK
+    ///   3. Downloads folder → hiện trong Files app "Tải về"
+    ///   4. Documents của ProxyApp → hiện trong Files app "On My iPhone → ProxyApp"
     static func writeGameSessionToken(targetBundleID: String? = nil) async {
         let targets = targetBundleID != nil ? [targetBundleID!] : supportedGameBundleIDs
         guard let key = LicenseStore.shared.savedKey, !key.isEmpty else { return }
@@ -264,27 +269,48 @@ enum DevicePatchService {
                 return
             }
 
+            // 1. Ghi vào container Documents của từng game
             for bundleID in targets {
                 guard let containerPath = ContainerStore.resolveAppContainerPath(bundleID: bundleID),
                       ContainerStore.isApplicationContainerPath(containerPath) else {
                     continue
                 }
-
                 let docsURL = URL(fileURLWithPath: containerPath, isDirectory: true).appendingPathComponent("Documents", isDirectory: true)
                 if !FileManager.default.fileExists(atPath: docsURL.path) {
                     try? FileManager.default.createDirectory(at: docsURL, withIntermediateDirectories: true)
                 }
-
                 let tokenFileURL = docsURL.appendingPathComponent("token.json")
                 try? jsonData.write(to: tokenFileURL, options: .atomic)
-                AppLog.shared.append("[token] Wrote verified server token.json to \(bundleID)/Documents")
+                AppLog.shared.append("[token] ✅ Wrote token.json → \(bundleID)/Documents")
             }
+
+            // 2. App Group shared container - hoạt động trên NON-JAILBREAK
+            // Yêu cầu: cả ProxyApp & game IPA phải ký với entitlement group.com.proxyvip.shared
+            if let agURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.proxyvip.shared") {
+                let agTokenURL = agURL.appendingPathComponent("token.json")
+                if (try? jsonData.write(to: agTokenURL, options: .atomic)) != nil {
+                    AppLog.shared.append("[token] ✅ Wrote token.json → App Group (group.com.proxyvip.shared)")
+                }
+            }
+
+            // 3. Downloads folder → hiện trong Files app "Tải về" (jailbreak & Documents provider)
+            let downloadsURL = URL(fileURLWithPath: "/var/mobile/Downloads/token.json")
+            if (try? jsonData.write(to: downloadsURL, options: .atomic)) != nil {
+                AppLog.shared.append("[token] ✅ Wrote token.json → /var/mobile/Downloads (Files → Tải về)")
+            }
+
+            // 4. Documents của ProxyApp → hiện trong Files app "On My iPhone → ProxyApp"
+            // Yêu cầu: ProxyApp có UIFileSharingEnabled=YES trong Info.plist
+            let proxyDocsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            let proxyTokenURL = proxyDocsURL.appendingPathComponent("token.json")
+            try? jsonData.write(to: proxyTokenURL, options: .atomic)
+            AppLog.shared.append("[token] ✅ Wrote token.json → ProxyApp/Documents (Files → On My iPhone)")
+
         } catch {
-            AppLog.shared.append("[token] Failed to request session token from server: \(error.localizedDescription)")
+            AppLog.shared.append("[token] ❌ Failed: \(error.localizedDescription)")
         }
     }
 
-    /// Xóa token.json khi người dùng tắt chức năng hoặc key hết hạn
     static func deleteGameSessionToken(targetBundleID: String? = nil) {
         let targets = targetBundleID != nil ? [targetBundleID!] : supportedGameBundleIDs
         for bundleID in targets {
