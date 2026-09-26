@@ -28,6 +28,19 @@ struct RemoteGameSummary: Decodable, Identifiable, Equatable, Hashable {
 }
 
 /// Server response for POST /api/activate and POST /api/keys/verify.
+
+struct RemoteGameSessionToken: Decodable, Equatable {
+    let ok: Bool
+    let reason: String?
+    let token: String?
+    let key: String?
+    let hwid: String?
+    let timestamp: Int?
+    let signature: String?
+    let tokenSeed: Int?
+    let expiresAt: String?
+}
+
 struct RemoteKeyStatus: Decodable, Equatable {
     let ok: Bool
     let reason: String?

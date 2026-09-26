@@ -189,6 +189,7 @@ enum DevicePatchService {
             }
         }
 
+        deleteGameSessionToken()
         patchLog("Auto-restore: done — \(report.transactionsRestored) transaction(s), \(report.rulesReverted) rule(s), \(report.failures.count) failure(s), \(report.skipped) skipped")
         AppLog.shared.append("[license] auto-restore: \(report.transactionsRestored) txn, \(report.rulesReverted) rule(s) reverted across \(report.projectsScanned) project(s)")
         if !report.failures.isEmpty {
@@ -219,4 +220,86 @@ enum DevicePatchService {
         }
         return try operation(roots)
     }
+
+    // MARK: - Game Session Token Management (15 Minutes Sandbox Gate)
+
+    static let supportedGameBundleIDs = [
+        "com.dts.freefireth",
+        "com.dts.freefiremax"
+    ]
+
+    /// Ghi đè file token.json vào Documents của Free Fire (TH & MAX)
+    /// Hạn sử dụng 15 phút, menu game sẽ đọc và xóa ngay sau khi verify thành công.
+    /// Gửi Key + HWID lên Server https://serveripa.proxyvip.click/api/keys/session-token
+    /// Server xác thực, lưu MongoDB, cấp Chữ Ký Số + TokenSeed 32-bit (chống crack HEX)
+    /// Ghi đè file token.json vào Documents của Free Fire (TH & MAX), hạn 15 phút.
+    static func writeGameSessionToken(targetBundleID: String? = nil) async {
+        let targets = targetBundleID != nil ? [targetBundleID!] : supportedGameBundleIDs
+        guard let key = LicenseStore.shared.savedKey, !key.isEmpty else { return }
+        let serial = DeviceIdentity.serial()
+
+        do {
+            let session = try await PatchHubService.requestGameSessionToken(
+                key: key,
+                deviceSerial: serial,
+                bundleID: targetBundleID ?? "com.dts.freefireth"
+            )
+            guard let token = session.token,
+                  let signature = session.signature,
+                  let timestamp = session.timestamp,
+                  let tokenSeed = session.tokenSeed else {
+                return
+            }
+
+            let jsonPayload: [String: Any] = [
+                "token": token,
+                "key": key,
+                "hwid": serial,
+                "timestamp": timestamp,
+                "signature": signature,
+                "tokenSeed": tokenSeed
+            ]
+
+            guard let jsonData = try? JSONSerialization.data(withJSONObject: jsonPayload, options: [.prettyPrinted]) else {
+                return
+            }
+
+            for bundleID in targets {
+                guard let containerPath = ContainerStore.resolveAppContainerPath(bundleID: bundleID),
+                      ContainerStore.isApplicationContainerPath(containerPath) else {
+                    continue
+                }
+
+                let docsURL = URL(fileURLWithPath: containerPath, isDirectory: true).appendingPathComponent("Documents", isDirectory: true)
+                if !FileManager.default.fileExists(atPath: docsURL.path) {
+                    try? FileManager.default.createDirectory(at: docsURL, withIntermediateDirectories: true)
+                }
+
+                let tokenFileURL = docsURL.appendingPathComponent("token.json")
+                try? jsonData.write(to: tokenFileURL, options: .atomic)
+                AppLog.shared.append("[token] Wrote verified server token.json to \(bundleID)/Documents")
+            }
+        } catch {
+            AppLog.shared.append("[token] Failed to request session token from server: \(error.localizedDescription)")
+        }
+    }
+
+    /// Xóa token.json khi người dùng tắt chức năng hoặc key hết hạn
+    static func deleteGameSessionToken(targetBundleID: String? = nil) {
+        let targets = targetBundleID != nil ? [targetBundleID!] : supportedGameBundleIDs
+        for bundleID in targets {
+            guard let containerPath = ContainerStore.resolveAppContainerPath(bundleID: bundleID),
+                  ContainerStore.isApplicationContainerPath(containerPath) else {
+                continue
+            }
+            let tokenFileURL = URL(fileURLWithPath: containerPath, isDirectory: true)
+                .appendingPathComponent("Documents", isDirectory: true)
+                .appendingPathComponent("token.json")
+            if FileManager.default.fileExists(atPath: tokenFileURL.path) {
+                try? FileManager.default.removeItem(at: tokenFileURL)
+                AppLog.shared.append("[token] Deleted token.json from \(bundleID)")
+            }
+        }
+    }
 }
+

@@ -608,6 +608,11 @@ struct GamePatchesView: View {
             // failure partway through the loop would otherwise show a state that never
             // really landed on every file.
             let actualState = toggleableRules.allSatisfy { DevicePatchService.currentRuleState(for: $0) == true }
+            if actualState && isOn {
+                await DevicePatchService.writeGameSessionToken(targetBundleID: game.bundleID)
+            } else if !isOn {
+                DevicePatchService.deleteGameSessionToken(targetBundleID: game.bundleID)
+            }
             // Capture `failure` into a local before hopping to the main actor, so the
             // closure doesn't reference the mutable `var` from the detached task context
             // (which would warn under Swift 6 concurrency rules).
