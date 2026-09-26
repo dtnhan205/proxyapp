@@ -168,7 +168,6 @@ enum SignedResponse {
         }
         NSLog("[SignedResponse] step 3 OK: public key loaded, blockSize=%d", SecKeyGetBlockSize(publicKey))
 
-        let verifyError: Unmanaged<CFError>?
         // Thử nhiều kiểu canonical khác nhau để chịu được cả server dùng
         // JCS RFC 8785 lẫn server custom stringify. Log ra để biết server
         // đang dùng kiểu nào.

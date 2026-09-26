@@ -725,7 +725,7 @@ extension GamePatchesView {
     /// patch trên disk vẫn còn hiệu lực nếu lần toggle trước thành công,
     /// chỉ là round-trip verify bị fail. Nếu revert nhầm, user sẽ bị tắt
     /// chức năng dù key vẫn còn hạn — tệ hơn cả trước khi sửa.
-    fileprivate static func isTransientKeyError(_ error: LicenseKeyError) -> Bool {
+    nonisolated fileprivate static func isTransientKeyError(_ error: LicenseKeyError) -> Bool {
         switch error {
         case .internalError, .missingKey, .invalidResponse:
             return true

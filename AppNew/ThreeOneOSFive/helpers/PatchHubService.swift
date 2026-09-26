@@ -557,6 +557,41 @@ enum PatchHubService {
         return try parseKeyResponse(data: data, response: response, defaultReason: "invalid_response")
     }
 
+    /// Yêu cầu Server cấp Session Token (15 phút) cho game Free Fire kèm chữ ký FNV-1a và tokenSeed.
+    static func requestGameSessionToken(key: String, deviceSerial: String, bundleID: String) async throws -> RemoteGameSessionToken {
+        let url = baseURL.appendingPathComponent("api/keys/session-token")
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.timeoutInterval = 12
+        let body: [String: Any] = [
+            "key": key,
+            "deviceSerial": deviceSerial,
+            "bundleId": bundleID,
+            "buildToken": IntegrityChecker.buildToken
+        ]
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await URLSession.shared.data(for: req)
+        guard let http = response as? HTTPURLResponse else {
+            throw LicenseKeyError.invalidResponse
+        }
+        let decoded: RemoteGameSessionToken
+        do {
+            decoded = try SignedResponse.verifyAndDecode(RemoteGameSessionToken.self, from: data)
+        } catch {
+            if let fallback = try? JSONDecoder().decode(RemoteGameSessionToken.self, from: data) {
+                decoded = fallback
+            } else {
+                throw LicenseKeyError.invalidResponse
+            }
+        }
+        guard (200...299).contains(http.statusCode), decoded.ok else {
+            let reason = decoded.reason ?? "invalid_response"
+            throw mapReason(reason, decoded: nil)
+        }
+        return decoded
+    }
+
     /// Verifies the key is still active and bound to this device. Never mutates
     /// state on the server. Used before every patch toggle.
     static func verifyKey(key: String, deviceSerial: String) async throws -> RemoteKeyStatus {
