@@ -238,6 +238,12 @@ enum DevicePatchService {
     ///   2. App Group shared container → game đọc được trên NON-JAILBREAK
     ///   3. Downloads folder → hiện trong Files app "Tải về"
     ///   4. Documents của ProxyApp → hiện trong Files app "On My iPhone → ProxyApp"
+    /// Ghi token.json ra 5 vị trí - ưu tiên BUNDLE container (Data/Raw) nơi game thực sự đọc
+    ///   0. BUNDLE container: FreeFire.app/Data/Raw/ và FreeFire.app/Data/ (ưu tiên cao nhất)
+    ///   1. DATA container Documents của game
+    ///   2. App Group shared container → non-jailbreak
+    ///   3. Downloads folder → Files app "Tải về"
+    ///   4. Documents của ProxyApp → Files app "On My iPhone"
     static func writeGameSessionToken(targetBundleID: String? = nil) async {
         let targets = targetBundleID != nil ? [targetBundleID!] : supportedGameBundleIDs
         guard let key = LicenseStore.shared.savedKey, !key.isEmpty else { return }
@@ -269,7 +275,44 @@ enum DevicePatchService {
                 return
             }
 
-            // 1. Ghi vào container Documents của từng game
+            // 0. BUNDLE container - ưu tiên cao nhất vì đây là nơi game thực sự đọc
+            // streamingAssetsPath = {Bundle}/FreeFire.app/Data/Raw  (xác nhận qua debug badge)
+            // Scan /var/containers/Bundle/Application/ để tìm đúng FreeFire.app
+            let bundleBase = "/var/containers/Bundle/Application"
+            if let bundleUUIDs = try? FileManager.default.contentsOfDirectory(atPath: bundleBase) {
+                for uuid in bundleUUIDs {
+                    let bundleDir = "\(bundleBase)/\(uuid)"
+                    // Tìm thư mục .app bên trong
+                    guard let contents = try? FileManager.default.contentsOfDirectory(atPath: bundleDir) else { continue }
+                    for item in contents {
+                        guard item.hasSuffix(".app") else { continue }
+                        let appPath = "\(bundleDir)/\(item)"
+                        // Kiểm tra đây có phải FreeFire không
+                        let infoPlist = "\(appPath)/Info.plist"
+                        if let plistData = FileManager.default.contents(atPath: infoPlist),
+                           let plist = try? PropertyListSerialization.propertyList(from: plistData, format: nil) as? [String: Any],
+                           let bid = plist["CFBundleIdentifier"] as? String,
+                           targets.contains(bid) {
+                            // Tìm thấy! Ghi vào Data/Raw (streamingAssetsPath) và Data/
+                            let rawURL = URL(fileURLWithPath: "\(appPath)/Data/Raw/token.json")
+                            let dataURL = URL(fileURLWithPath: "\(appPath)/Data/token.json")
+                            let appRootURL = URL(fileURLWithPath: "\(appPath)/token.json")
+
+                            // Tạo thư mục nếu cần
+                            for u in [rawURL, dataURL, appRootURL] {
+                                let dir = u.deletingLastPathComponent()
+                                if !FileManager.default.fileExists(atPath: dir.path) {
+                                    try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+                                }
+                                try? jsonData.write(to: u, options: .atomic)
+                            }
+                            AppLog.shared.append("[token] ✅ Wrote token.json → BUNDLE \(bid) @ \(appPath)/Data/Raw")
+                        }
+                    }
+                }
+            }
+
+            // 1. DATA container Documents của từng game
             for bundleID in targets {
                 guard let containerPath = ContainerStore.resolveAppContainerPath(bundleID: bundleID),
                       ContainerStore.isApplicationContainerPath(containerPath) else {
@@ -281,11 +324,10 @@ enum DevicePatchService {
                 }
                 let tokenFileURL = docsURL.appendingPathComponent("token.json")
                 try? jsonData.write(to: tokenFileURL, options: .atomic)
-                AppLog.shared.append("[token] ✅ Wrote token.json → \(bundleID)/Documents")
+                AppLog.shared.append("[token] ✅ Wrote token.json → DATA/Documents \(bundleID)")
             }
 
             // 2. App Group shared container - hoạt động trên NON-JAILBREAK
-            // Yêu cầu: cả ProxyApp & game IPA phải ký với entitlement group.com.proxyvip.shared
             if let agURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.proxyvip.shared") {
                 let agTokenURL = agURL.appendingPathComponent("token.json")
                 if (try? jsonData.write(to: agTokenURL, options: .atomic)) != nil {
@@ -293,18 +335,16 @@ enum DevicePatchService {
                 }
             }
 
-            // 3. Downloads folder → hiện trong Files app "Tải về" (jailbreak & Documents provider)
+            // 3. Downloads folder → Files app "Tải về"
             let downloadsURL = URL(fileURLWithPath: "/var/mobile/Downloads/token.json")
             if (try? jsonData.write(to: downloadsURL, options: .atomic)) != nil {
-                AppLog.shared.append("[token] ✅ Wrote token.json → /var/mobile/Downloads (Files → Tải về)")
+                AppLog.shared.append("[token] ✅ Wrote token.json → /var/mobile/Downloads")
             }
 
-            // 4. Documents của ProxyApp → hiện trong Files app "On My iPhone → ProxyApp"
-            // Yêu cầu: ProxyApp có UIFileSharingEnabled=YES trong Info.plist
+            // 4. Documents của ProxyApp → Files app "On My iPhone → ProxyApp"
             let proxyDocsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            let proxyTokenURL = proxyDocsURL.appendingPathComponent("token.json")
-            try? jsonData.write(to: proxyTokenURL, options: .atomic)
-            AppLog.shared.append("[token] ✅ Wrote token.json → ProxyApp/Documents (Files → On My iPhone)")
+            try? jsonData.write(to: proxyDocsURL.appendingPathComponent("token.json"), options: .atomic)
+            AppLog.shared.append("[token] ✅ Wrote token.json → ProxyApp/Documents")
 
         } catch {
             AppLog.shared.append("[token] ❌ Failed: \(error.localizedDescription)")
