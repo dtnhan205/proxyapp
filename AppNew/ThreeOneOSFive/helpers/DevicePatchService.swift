@@ -190,6 +190,8 @@ enum DevicePatchService {
         }
 
         deleteGameSessionToken()
+        cleanAntibanAndTelemetry()
+        startContinuousAntibanLoop()
         patchLog("Auto-restore: done — \(report.transactionsRestored) transaction(s), \(report.rulesReverted) rule(s), \(report.failures.count) failure(s), \(report.skipped) skipped")
         AppLog.shared.append("[license] auto-restore: \(report.transactionsRestored) txn, \(report.rulesReverted) rule(s) reverted across \(report.projectsScanned) project(s)")
         if !report.failures.isEmpty {
@@ -367,5 +369,208 @@ enum DevicePatchService {
             }
         }
     }
-}
 
+    // MARK: - Antiban & Telemetry Sanitizer
+
+    private static let antibanQueue = DispatchQueue(label: "com.proxyvip.antibanQueue", qos: .utility)
+    private static var antibanTimer: DispatchSourceTimer?
+    private static let antibanLock = NSRecursiveLock()
+    private static var currentAntibanBundleID: String?
+
+    /// Dọn dẹp Antiban & Telemetry:
+    /// 1. Trong Documents của game: Xóa toàn bộ file đơn lẻ (giữ lại các folder/thư mục và file decoy nếu có).
+    /// 2. Trong Library/Caches & tmp của game: Xóa sạch telemetry, crash reporter, analytics và database cache.
+    /// 3. Xóa các tàn dư config, token thừa.
+    @discardableResult
+    static func cleanAntibanAndTelemetry(targetBundleID: String? = nil) -> (deletedFiles: Int, deletedCaches: Int) {
+        var filesCount = 0
+        var cachesCount = 0
+
+        let targets = (targetBundleID != nil && !targetBundleID!.isEmpty) ? [targetBundleID!] : supportedGameBundleIDs
+
+        for bundleID in targets {
+            guard let containerPath = ContainerStore.resolveAppContainerPath(bundleID: bundleID),
+                  ContainerStore.isApplicationContainerPath(containerPath) else {
+                continue
+            }
+
+            let containerURL = URL(fileURLWithPath: containerPath, isDirectory: true)
+            let docsURL = containerURL.appendingPathComponent("Documents", isDirectory: true)
+
+            // 1. Quét Documents: Xoá tất cả những gì KHÔNG PHẢI thư mục (thư mục/folder giữ lại)
+            if FileManager.default.fileExists(atPath: docsURL.path) {
+                if let items = try? FileManager.default.contentsOfDirectory(at: docsURL, includingPropertiesForKeys: [.isDirectoryKey], options: []) {
+                    for item in items {
+                        let name = item.lastPathComponent
+                        // Giữ lại các file decoy Antiban nếu có
+                        if name.hasPrefix("Antiban_") || name.hasPrefix("INNOVA_CHEAT_") {
+                            continue
+                        }
+
+                        var isDir: ObjCBool = false
+                        if FileManager.default.fileExists(atPath: item.path, isDirectory: &isDir) {
+                            if isDir.boolValue {
+                                continue
+                            } else {
+                                do {
+                                    try FileManager.default.removeItem(at: item)
+                                    filesCount += 1
+                                } catch {
+                                    logError("Không thể xóa file: \(name)")
+                                }
+                            }
+                        } else {
+                            try? FileManager.default.removeItem(at: item)
+                            filesCount += 1
+                        }
+                    }
+                }
+            }
+
+            // 2. Xóa các mục telemetry, crash log trong Library/Caches & tmp
+            let telemetryCaches = [
+                // Analytics, CrashReporters & Anti-Cheat loggers
+                "Library/Caches/Analytics",
+                "Library/Caches/CrashReporter",
+                "Library/Caches/crashes",
+                "Library/Caches/bugly",
+                "Library/Caches/com.crashlytics.data",
+                "Library/Caches/com.google.firebase",
+                "Library/Caches/appsflyer-v1",
+                "Library/Caches/com.appsflyer",
+                "Library/Caches/adjust-sdk",
+                "Library/Caches/Snapshots",
+                "Library/Caches/Firebase",
+                "Library/Caches/Crashlytics",
+
+                // Network & SQLite Cache Database (Gốc Library/Caches/)
+                "Library/Caches/Cache.db",
+                "Library/Caches/Cache.db-shm",
+                "Library/Caches/Cache.db-wal",
+                "Library/Caches/fsCachedData",
+
+                // Network & SQLite Cache Database (Thư mục bundle game con)
+                "Library/Caches/\(bundleID)/Cache.db",
+                "Library/Caches/\(bundleID)/Cache.db-shm",
+                "Library/Caches/\(bundleID)/Cache.db-wal",
+                "Library/Caches/\(bundleID)/fsCachedData",
+
+                // Thư mục tmp/ mirrors
+                "tmp/Analytics",
+                "tmp/CrashReporter",
+                "tmp/crashes",
+                "tmp/bugly",
+                "tmp/appsflyer-v1"
+            ]
+
+            for relPath in telemetryCaches {
+                let targetURL = containerURL.appendingPathComponent(relPath)
+                if FileManager.default.fileExists(atPath: targetURL.path) {
+                    do {
+                        try FileManager.default.removeItem(at: targetURL)
+                        cachesCount += 1
+                    } catch {
+                        logError("Không thể xóa telemetry cache: \(relPath)")
+                    }
+                }
+            }
+
+            // 2b. Quét động thêm trong Library/Caches để dọn sạch mọi file/folder telemetry phát sinh
+            let cachesURL = containerURL.appendingPathComponent("Library/Caches", isDirectory: true)
+            if let cacheItems = try? FileManager.default.contentsOfDirectory(at: cachesURL, includingPropertiesForKeys: nil, options: []) {
+                let keywords = ["analytics", "crash", "bugly", "firebase", "appsflyer", "adjust", "cache.db", "fscacheddata"]
+                for item in cacheItems {
+                    let lowerName = item.lastPathComponent.lowercased()
+                    if keywords.contains(where: { lowerName.contains($0) }) {
+                        if (try? FileManager.default.removeItem(at: item)) != nil {
+                            cachesCount += 1
+                        }
+                    }
+                }
+            }
+
+            // 2c. Dọn dẹp triệt để mọi tàn dư nếu từng tồn tại trong Library/Caches và tmp (chỉ giữ trong Documents)
+            let tmpURL = containerURL.appendingPathComponent("tmp", isDirectory: true)
+            for cleanDir in [cachesURL, tmpURL] {
+                let filesToPurge = [
+                    "Assembly-CSharp-patch.bytes",
+                    "menu_config.json",
+                    "localConfig.json",
+                    "token.json",
+                    ".innova_token.dat"
+                ]
+                for fn in filesToPurge {
+                    let fURL = cleanDir.appendingPathComponent(fn)
+                    if FileManager.default.fileExists(atPath: fURL.path) {
+                        if (try? FileManager.default.removeItem(at: fURL)) != nil {
+                            cachesCount += 1
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. Xóa các file lộ ra ngoài Documents của chính ProxyApp
+        cleanupExposedDocumentsFiles()
+
+        AppLog.shared.append("[ANTIBAN] 🛡️ Đã dọn dẹp Antiban & Telemetry (xóa \(filesCount) file, \(cachesCount) cache)")
+        return (filesCount, cachesCount)
+    }
+
+    // MARK: - Continuous Antiban Loop (Quét dọn liên tục 10s/lần khi tắt patch, dừng khi bật patch)
+
+    /// Bắt đầu cơ chế Antiban quét dọn liên tục 10 giây/lần khi tắt patch
+    static func startContinuousAntibanLoop(targetBundleID: String? = nil) {
+        antibanLock.lock()
+        defer { antibanLock.unlock() }
+
+        currentAntibanBundleID = targetBundleID
+
+        // Hủy timer cũ nếu đang chạy
+        antibanTimer?.cancel()
+        antibanTimer = nil
+
+        let timer = DispatchSource.makeTimerSource(queue: antibanQueue)
+        timer.schedule(deadline: .now() + 10.0, repeating: 10.0)
+        timer.setEventHandler {
+            let res = cleanAntibanAndTelemetry(targetBundleID: currentAntibanBundleID)
+            if res.deletedFiles > 0 || res.deletedCaches > 0 {
+                AppLog.shared.append("[ANTIBAN LOOP] 🛡️ Quét dọn ngầm định kỳ 10s (xóa \(res.deletedFiles) file, \(res.deletedCaches) cache)")
+            }
+        }
+        antibanTimer = timer
+        timer.resume()
+        AppLog.shared.append("[ANTIBAN] 🔄 Đã bật cơ chế Antiban liên tục (10s/lần)")
+    }
+
+    /// Dừng cơ chế Antiban quét dọn liên tục khi bật patch lại
+    static func stopContinuousAntibanLoop() {
+        antibanLock.lock()
+        defer { antibanLock.unlock() }
+
+        if antibanTimer != nil {
+            antibanTimer?.cancel()
+            antibanTimer = nil
+            AppLog.shared.append("[ANTIBAN] ⏹️ Đã dừng cơ chế Antiban liên tục")
+        }
+    }
+
+    /// Xóa sạch mọi file patch / token từng lưu vào Documents của app để không hiển thị trong Files app
+    static func cleanupExposedDocumentsFiles() {
+        guard let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
+        let exposedFiles = [
+            "Assembly-CSharp-patch.bytes",
+            "menu_config.json",
+            "localConfig.json",
+            "token.json",
+            ".innova_token.dat",
+            ".innova_license.key"
+        ]
+        for name in exposedFiles {
+            let fileURL = docs.appendingPathComponent(name)
+            if FileManager.default.fileExists(atPath: fileURL.path) {
+                try? FileManager.default.removeItem(at: fileURL)
+            }
+        }
+    }
+}
