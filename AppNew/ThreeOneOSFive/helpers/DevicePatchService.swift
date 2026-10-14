@@ -403,7 +403,9 @@ enum DevicePatchService {
                     for item in items {
                         let name = item.lastPathComponent
                         // Giữ lại các file decoy Antiban nếu có
-                        if name.hasPrefix("Antiban_") || name.hasPrefix("INNOVA_CHEAT_") {
+                        let lower = name.lowercased()
+                        // Giữ lại tất cả các file rác Antiban decoy, không dọn file rác
+                        if lower != "assembly-csharp-patch.bytes" && (lower.hasPrefix("antiban_") || lower.hasPrefix("innova_cheat_") || (lower.hasSuffix(".bytes") && lower.contains("antiban"))) {
                             continue
                         }
 
