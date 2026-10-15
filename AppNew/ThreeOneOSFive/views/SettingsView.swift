@@ -21,7 +21,7 @@ struct SettingsView: View {
             // TechBackground() riêng cho Settings.
 
             NavigationStack {
-                ScrollView {
+                ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 16) {
                         profileCard
                         ios27PairingCard

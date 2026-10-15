@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import SwiftUI
 import Darwin
 import Combine
 
@@ -11,36 +12,160 @@ import Combine
 // ═══════════════════════════════════════════════════════
 private let IS_LOGGING_DISABLED: Bool = false
 
-// MARK: - Global logger
+// MARK: - Global logger (High-performance, persistent file-backed, throttled, deduplicated)
 class AppLog: ObservableObject {
     static let shared = AppLog()
+    static let maxCapacity: Int = 500
+
     @Published var entries: [String] = []
-    func append(_ msg: String) {
-        if !IS_LOGGING_DISABLED {
-            DispatchQueue.main.async { self.entries.append(msg) }
+
+    private let lock = NSLock()
+    private var lastMessage: String = ""
+    private var repeatCount: Int = 1
+
+    // Persistent file logging path: Documents/log.txt (Accessible in Files app)
+    static var logFileURL: URL {
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        return docs.appendingPathComponent("log.txt")
+    }
+
+    private let fileQueue = DispatchQueue(label: "com.innova.logger.file", qos: .utility)
+    private var fileHandle: FileHandle?
+    private let timeFormatter: DateFormatter = {
+        let df = DateFormatter()
+        df.dateFormat = "HH:mm:ss.SSS"
+        return df
+    }()
+
+    private init() {
+        setupFile()
+        writeSessionHeader()
+    }
+
+    private func setupFile() {
+        let url = Self.logFileURL
+        if !FileManager.default.fileExists(atPath: url.path) {
+            FileManager.default.createFile(atPath: url.path, contents: nil, attributes: nil)
+        }
+        self.fileHandle = try? FileHandle(forWritingTo: url)
+        self.fileHandle?.seekToEndOfFile()
+    }
+
+    private func writeSessionHeader() {
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        let dateStr = df.string(from: Date())
+        let header = """
+        \n══════════════════════════════════════════════════════════════════════
+        🚀 ProxyVipVn · PHIÊN LÀM VIỆC BẮT ĐẦU: \(dateStr)
+        📱 Thiết bị: \(AppInfo.displayMachineName) · iOS \(AppInfo.osVersion) (\(AppInfo.osBuild))
+        📦 Ứng dụng: ProxyVipVn
+        📁 Vị trí log: \(Self.logFileURL.path)
+        ══════════════════════════════════════════════════════════════════════\n
+        """
+        appendRawToFile(header)
+    }
+
+    private func appendRawToFile(_ text: String) {
+        fileQueue.async { [weak self] in
+            guard let self = self else { return }
+            if self.fileHandle == nil {
+                self.setupFile()
+            }
+            guard let handle = self.fileHandle else { return }
+            if let data = text.data(using: .utf8) {
+                try? handle.write(contentsOf: data)
+            }
         }
     }
+
+    func append(_ msg: String) {
+        if IS_LOGGING_DISABLED { return }
+
+        let trimmed = msg.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        let timestamp = timeFormatter.string(from: Date())
+        let formattedForFile = "[\(timestamp)] \(trimmed)\n"
+        appendRawToFile(formattedForFile)
+
+        lock.lock()
+        // Deduplicate consecutive identical messages in memory to prevent UI flood
+        if trimmed == lastMessage {
+            repeatCount += 1
+            let repeatedText = "\(trimmed) (x\(repeatCount))"
+            lock.unlock()
+            DispatchQueue.main.async {
+                if !self.entries.isEmpty {
+                    self.entries[self.entries.count - 1] = repeatedText
+                } else {
+                    self.entries.append(repeatedText)
+                }
+            }
+            return
+        }
+
+        lastMessage = trimmed
+        repeatCount = 1
+        lock.unlock()
+
+        DispatchQueue.main.async {
+            self.entries.append(trimmed)
+            if self.entries.count > Self.maxCapacity {
+                self.entries.removeFirst(self.entries.count - Self.maxCapacity)
+            }
+        }
+    }
+
+    func flush() {
+        fileQueue.sync {
+            try? self.fileHandle?.synchronize()
+        }
+    }
+
+    func clear() {
+        lock.lock()
+        lastMessage = ""
+        repeatCount = 1
+        lock.unlock()
+        DispatchQueue.main.async {
+            self.entries.removeAll()
+        }
+        fileQueue.async { [weak self] in
+            guard let self = self else { return }
+            try? self.fileHandle?.close()
+            self.fileHandle = nil
+            try? FileManager.default.removeItem(at: Self.logFileURL)
+            self.setupFile()
+            self.writeSessionHeader()
+        }
+    }
+
+    func exportLogURL() -> URL {
+        flush()
+        return Self.logFileURL
+    }
 }
+
 func log(_ msg: String) {
     if !IS_LOGGING_DISABLED {
         AppLog.shared.append("[3105] \(msg)")
     }
 }
 
-// Retain the pipe for the app's lifetime so stdout/stderr stay redirected.
+// Retain the pipe for the app's lifetime so stdout stays redirected.
 private var logCapturePipe: Pipe?
 
-// Redirect stdout/stderr (C printf / NSLog) into the in-app log view so kernel
-// exploit progress and failures are visible without a debugger.
+// Redirect stdout (C printf) into in-app log view with strict intelligent filtering.
+// NOTE: We intentionally do NOT redirect STDERR to avoid capturing noisy iOS framework warnings.
 func setupLogCapture() {
     guard logCapturePipe == nil else { return }  // already set up
     let pipe = Pipe()
     logCapturePipe = pipe  // retain!
 
     setvbuf(stdout, nil, _IONBF, 0)
-    setvbuf(stderr, nil, _IONBF, 0)
     let writeFd = pipe.fileHandleForWriting.fileDescriptor
-    if dup2(writeFd, STDOUT_FILENO) < 0 || dup2(writeFd, STDERR_FILENO) < 0 {
+    if dup2(writeFd, STDOUT_FILENO) < 0 {
         log("setupLogCapture: dup2 failed, log capture disabled")
         logCapturePipe = nil
         return
@@ -49,15 +174,49 @@ func setupLogCapture() {
     pipe.fileHandleForReading.readabilityHandler = { handle in
         let data = handle.availableData
         guard !data.isEmpty else { return }
-        if let text = String(data: data, encoding: .utf8) {
-            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !trimmed.isEmpty {
-                DispatchQueue.main.async {
-                    AppLog.shared.append(trimmed)
-                }
+        guard let text = String(data: data, encoding: .utf8) else { return }
+
+        let lines = text.components(separatedBy: .newlines)
+        for rawLine in lines {
+            let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !line.isEmpty else { continue }
+
+            // Filter out system daemon spam (Metal, WebKit, CoreGraphics, UIKit warnings)
+            let isRelevant = line.hasPrefix("[+]") || line.hasPrefix("[-]") || line.hasPrefix("[*]") ||
+                             line.hasPrefix("[!]") || line.hasPrefix("[3105]") || line.hasPrefix("[CHEAT]") ||
+                             line.hasPrefix("[CONFIG]") || line.hasPrefix("[INJECT]") || line.hasPrefix("[UNINJECT]") ||
+                             line.hasPrefix("[AIM]") || line.hasPrefix("[ESP]") || line.hasPrefix("[COMBAT]") ||
+                             line.hasPrefix("[license]") || line.hasPrefix("[token]") ||
+                             line.hasPrefix("[PAIRING]") || line.hasPrefix("[AIRLIFT]") || line.hasPrefix("[VPN]") ||
+                             line.localizedCaseInsensitiveContains("kernel") ||
+                             line.localizedCaseInsensitiveContains("exploit") ||
+                             line.localizedCaseInsensitiveContains("krw") ||
+                             line.localizedCaseInsensitiveContains("airlift") ||
+                             line.localizedCaseInsensitiveContains("rppairing") ||
+                             line.localizedCaseInsensitiveContains("tunnel") ||
+                             line.localizedCaseInsensitiveContains("idevice") ||
+                             line.localizedCaseInsensitiveContains("atc") ||
+                             line.localizedCaseInsensitiveContains("remotexpc") ||
+                             line.localizedCaseInsensitiveContains("pairing") ||
+                             line.localizedCaseInsensitiveContains("books")
+
+            if isRelevant {
+                AppLog.shared.append(line)
             }
         }
     }
+}
+
+// MARK: - Global Share Sheet
+struct ShareSheet: UIViewControllerRepresentable {
+    let activityItems: [Any]
+    var applicationActivities: [UIActivity]? = nil
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: activityItems, applicationActivities: applicationActivities)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
 // MARK: - App Info
