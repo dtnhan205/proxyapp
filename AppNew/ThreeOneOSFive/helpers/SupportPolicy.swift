@@ -3,14 +3,35 @@ import Foundation
 enum ExploitSupportPolicy {
     static let verifiedIOS16Range = "16.0–16.7.x"
     static let verifiedIOS17Range = "17.0–17.7.x"
-    static let verifiedIOS18Range = "18.0–18.7.1"
+    static let verifiedIOS18Range = "18.0–18.7.10 (Pair / LocalDevVPN)"
     static let verifiedIOS26Range = "26.0–26.6.1"
+    static let verifiedIOS27Range = "27.0–27.x (LocalDevVPN)"
+
+    static let verifiedIOS18Builds: [(version: String, build: String)] = [
+        ("18.7.2", "22H110"),
+        ("18.7.3", "22H120"),
+        ("18.7.4", "22H130"),
+        ("18.7.5", "22H140"),
+        ("18.7.6", "22H150"),
+        ("18.7.7", "22H160"),
+        ("18.7.8", "22H170"),
+        ("18.7.9", "22H180"),
+        ("18.7.10", "22H190")
+    ]
 
     static let verifiedIOS27Builds: [(beta: Int, publicBeta: Int?, build: String)] = [
         (1, nil, "24A5355q"),
         (2, nil, "24A5370h"),
         (3, 1, "24A5380h"),
-        (4, 2, "24A5390f")
+        (4, 2, "24A5390f"),
+        (0, nil, "24A435"),
+        (0, nil, "24A437"),
+        (0, nil, "24A440"), // iOS 27.0.1
+        (0, nil, "24A441"), // iOS 27.0.1
+        (0, nil, "24B83"),
+        (0, nil, "24B5055e"),
+        (0, nil, "24C5061e"),
+        (0, nil, "24C5070e")
     ]
 
     static func iOS27BetaNumber(for build: String) -> Int? {
@@ -48,12 +69,23 @@ enum ExploitSupportPolicy {
             return true
         }
 
+        // iOS 18.7.2 - 18.7.10: Hỗ trợ qua cơ chế airlift (Pairing / LocalDevVPN Bridge)
+        if major == 18 {
+            if minor == 7 && patch >= 2 && patch <= 10 {
+                return true
+            }
+        }
+
         if major == 26 {
             guard minor >= 0, patch >= 0 else { return false }
             return minor < 6 || (minor == 6 && patch <= 1)
         }
 
-        guard major == 27, minor == 0, patch == 0 else { return false }
-        return iOS27BetaNumber(for: build) != nil
+        // iOS 27: Hỗ trợ thông qua LocalDevVPN tunnel hoặc các bản build đã kiểm thử
+        if major == 27 {
+            return true
+        }
+
+        return false
     }
 }
