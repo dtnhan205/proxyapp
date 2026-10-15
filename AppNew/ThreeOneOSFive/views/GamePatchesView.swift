@@ -786,7 +786,7 @@ struct GamePatchesView: View {
             } catch let error as PatchPackageError {
                 failure = error
             } catch {
-                failure = .applyFailed
+                failure = .message(error.localizedDescription)
             }
 
             // Re-read actual on-device state rather than assume success

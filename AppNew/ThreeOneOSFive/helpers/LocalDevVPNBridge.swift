@@ -545,7 +545,7 @@ enum LocalDevVPNBridge {
                     sourceDir: stagingDir.path,
                     targetDir: "\(containerPath)/Documents",
                     pairingPath: pairingPath,
-                    timeoutSeconds: 6.0
+                    timeoutSeconds: 40.0
                 )
                 success = true
                 AppLog.shared.append("[VPN] ✅ Ghi file qua AirTraffic tunnel thành công!")
@@ -661,7 +661,7 @@ enum LocalDevVPNBridge {
                     sourceDir: stagingDir.path,
                     targetDir: "\(containerPath)/Documents",
                     pairingPath: pairingPath,
-                    timeoutSeconds: 6.0
+                    timeoutSeconds: 40.0
                 )
                 airtrafficSuccess = true
                 AppLog.shared.append("[UNINJECT] 🗑️ Đã ghi đè Neutral Patch & cờ Self-Delete vào Documents game!")

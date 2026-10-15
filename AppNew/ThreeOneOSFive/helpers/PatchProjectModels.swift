@@ -162,6 +162,7 @@ enum PatchPackageError: Error, Equatable {
     case restoreFailed
     case invalidImportLink
     case remoteImportFailed
+    case message(String)
 }
 
 extension PatchPackageError: LocalizedError {
@@ -182,10 +183,14 @@ extension PatchPackageError: LocalizedError {
         case .restoreFailed: return "patch.error.restore"
         case .invalidImportLink: return "patch.error.invalid_import_link"
         case .remoteImportFailed: return "patch.error.remote_import"
+        case .message(let msg): return msg
         }
     }
 
     var errorDescription: String? {
+        if case .message(let msg) = self {
+            return msg
+        }
         let message = String(localized: String.LocalizationValue(localizationKey))
         if let localizationArgument {
             return String(format: message, localizationArgument)

@@ -201,7 +201,11 @@ final class RemotePairingAdvertiser: NSObject, ObservableObject, NetServiceDeleg
         if FileManager.default.fileExists(atPath: deltaPath) {
             return deltaPath
         }
-        return innovaPath
+        let airliftPath = (docs as NSString).appendingPathComponent("airlift_pairing.plist")
+        if FileManager.default.fileExists(atPath: airliftPath) {
+            return airliftPath
+        }
+        return proxyPath
     }
 
     var hasExistingPairing: Bool {
@@ -594,6 +598,8 @@ final class RemotePairingAdvertiser: NSObject, ObservableObject, NetServiceDeleg
     func deleteStoredPairingCredentials() {
         let docs = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true)[0]
         let paths = [
+            (docs as NSString).appendingPathComponent("proxy_pairing.plist"),
+            (docs as NSString).appendingPathComponent("proxy_pairing_import.plist"),
             (docs as NSString).appendingPathComponent("innova_pairing.plist"),
             (docs as NSString).appendingPathComponent("innova_pairing_import.plist"),
             (docs as NSString).appendingPathComponent("delta_pairing.plist"),
@@ -657,17 +663,20 @@ enum AirliftBridge {
             if !vpn.tunnelIP.isEmpty && !hosts.contains(vpn.tunnelIP) {
                 hosts.append(vpn.tunnelIP)
             }
-            if !hosts.contains("10.7.0.1") { hosts.append("10.7.0.1") }
-            if !hosts.contains("10.7.1.1") { hosts.append("10.7.1.1") }
         }
 
-        // 2. Loopback local (LUÔN LUÔN khả dụng trên iOS và không bao giờ bị kernel drop packet)
+        // 2. IP Wi-Fi cục bộ của thiết bị (ví dụ: 192.168.1.9)
+        if let wifiIP = RemotePairingAdvertiser.getWiFiAddress(), !wifiIP.isEmpty, !hosts.contains(wifiIP) {
+            hosts.append(wifiIP)
+        }
+
+        // 3. Fallbacks tiêu chuẩn của hệ thống
+        if !hosts.contains("10.7.0.1") { hosts.append("10.7.0.1") }
+        if !hosts.contains("10.7.1.1") { hosts.append("10.7.1.1") }
         if !hosts.contains("127.0.0.1") { hosts.append("127.0.0.1") }
         if !hosts.contains("::1") { hosts.append("::1") }
 
-        // Primary host: Nếu VPN bật -> dùng VPN IP (10.7.0.1). Nếu không -> dùng loopback 127.0.0.1
-        // TUYỆT ĐỐI KHÔNG dùng Wi-Fi IP của chính máy (192.168.x.x) làm primary vì iOS kernel chặn loopback Wi-Fi gây treo socket 75s!
-        let primary = (vpn.active && !vpn.deviceIP.isEmpty) ? vpn.deviceIP : "127.0.0.1"
+        let primary = (vpn.active && !vpn.deviceIP.isEmpty) ? vpn.deviceIP : (hosts.first ?? "127.0.0.1")
         al_set_target_host(primary)
 
         let cStrings = hosts.map { strdup($0) }
@@ -688,7 +697,7 @@ enum AirliftBridge {
     }
 
     /// Truy vấn đồng bộ đường dẫn Application Container qua RSD tunnel (Installation Proxy) có timeout bảo vệ
-    static func findAppContainerSync(bundleID: String, pairingPath: String, timeoutSeconds: Double = 5.0) -> String? {
+    static func findAppContainerSync(bundleID: String, pairingPath: String, timeoutSeconds: Double = 20.0) -> String? {
         guard FileManager.default.fileExists(atPath: pairingPath) else {
             AppLog.shared.append("[AIRLIFT] ⚠️ Không tìm thấy file pairing: \(pairingPath)")
             RemotePairingAdvertiser.shared.log("⚠️ [AIRLIFT] Không có file pairing: \(pairingPath)")
@@ -770,7 +779,7 @@ enum AirliftBridge {
         return try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
-                    try writeDirectorySync(sourceDir: sourceDir, targetDir: targetDir, pairingPath: pairingPath, timeoutSeconds: 6.0)
+                    try writeDirectorySync(sourceDir: sourceDir, targetDir: targetDir, pairingPath: pairingPath, timeoutSeconds: 40.0)
                     continuation.resume(returning: ())
                 } catch {
                     continuation.resume(throwing: error)
@@ -780,7 +789,7 @@ enum AirliftBridge {
     }
 
     /// Ghi đồng bộ toàn bộ nội dung trong `sourceDir` vào `targetDir` trên thiết bị qua AirTraffic tunnel (có timeout 6s chống treo)
-    static func writeDirectorySync(sourceDir: String, targetDir: String, pairingPath: String, timeoutSeconds: Double = 6.0) throws {
+    static func writeDirectorySync(sourceDir: String, targetDir: String, pairingPath: String, timeoutSeconds: Double = 40.0) throws {
         guard FileManager.default.fileExists(atPath: pairingPath) else {
             throw NSError(
                 domain: "AirliftBridge",
@@ -846,7 +855,7 @@ enum AirliftBridge {
 
     /// Inject đồng bộ cả thư mục kèm cấu trúc nội bộ vào `targetParentDir/destName`
     @discardableResult
-    static func injectFolderSync(folderPath: String, targetParentDir: String, destName: String, pairingPath: String, timeoutSeconds: Double = 6.0) -> Int32 {
+    static func injectFolderSync(folderPath: String, targetParentDir: String, destName: String, pairingPath: String, timeoutSeconds: Double = 40.0) -> Int32 {
         guard FileManager.default.fileExists(atPath: pairingPath) else { return -1 }
         syncTargetHosts()
         var outError: UnsafeMutablePointer<CChar>? = nil

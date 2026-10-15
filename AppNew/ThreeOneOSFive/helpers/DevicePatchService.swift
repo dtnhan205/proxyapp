@@ -118,11 +118,22 @@ enum DevicePatchService {
             }
         }
 
+        if containerPath == nil && RemotePairingAdvertiser.shared.hasExistingPairing {
+            let pairingPath = RemotePairingAdvertiser.shared.pairingFilePath
+            AppLog.shared.append("[PATCH] 🔍 Dò container cho \(targetBundleID) qua RSD...")
+            containerPath = AirliftBridge.findAppContainerSync(bundleID: targetBundleID, pairingPath: pairingPath, timeoutSeconds: 20.0)
+            if containerPath == nil {
+                let altID = (targetBundleID == "com.dts.freefireth") ? "com.dts.freefiremax" : "com.dts.freefireth"
+                containerPath = AirliftBridge.findAppContainerSync(bundleID: altID, pairingPath: pairingPath, timeoutSeconds: 20.0)
+                if containerPath != nil { targetBundleID = altID }
+            }
+        }
+
         guard let finalContainer = containerPath, !finalContainer.isEmpty else {
             logError("Target app container unavailable for: \(targetBundleID)")
             AppLog.shared.append("[PATCH] ❌ Không tìm thấy container cho app: \(targetBundleID)")
             RemotePairingAdvertiser.shared.log("❌ [PATCH] Không có container \(targetBundleID)")
-            throw PatchPackageError.targetAppUnavailable(targetBundleID)
+            throw PatchPackageError.message("Không tìm thấy app game (\(targetBundleID)). Hãy mở game ít nhất 1 lần rồi thử lại.")
         }
 
         // --- TIER 1: GHI TRỰC TIẾP POSIX (Tốc độ tức thì ~1-3ms) ---
@@ -278,15 +289,24 @@ enum DevicePatchService {
                 try? tokenData.write(to: deepTokDir.appendingPathComponent("token.json"), options: .atomic)
             }
 
-            AppLog.shared.append("[PATCH] 🚀 Ghi batch \(rules.count) rules + token qua Airlift tunnel: \(finalContainer)/Documents...")
+            let targetDocsDir: String
+            if finalContainer.hasSuffix("/Documents") {
+                targetDocsDir = finalContainer
+            } else if finalContainer.hasSuffix("/") {
+                targetDocsDir = "\(finalContainer)Documents"
+            } else {
+                targetDocsDir = "\(finalContainer)/Documents"
+            }
+
+            AppLog.shared.append("[PATCH] 🚀 Ghi batch \(rules.count) rules + token qua Airlift tunnel: \(targetDocsDir)...")
             RemotePairingAdvertiser.shared.log("🚀 [AIRLIFT] Ghi \(rules.count) files vào \(targetBundleID)...")
 
             do {
                 try AirliftBridge.writeDirectorySync(
                     sourceDir: stagingDir.path,
-                    targetDir: "\(finalContainer)/Documents",
+                    targetDir: targetDocsDir,
                     pairingPath: pairingPath,
-                    timeoutSeconds: 6.0
+                    timeoutSeconds: 40.0
                 )
                 for rule in rules {
                     UserDefaults.standard.set(isOn, forKey: "patch.rule_state.\(rule.id.uuidString)")
@@ -307,12 +327,17 @@ enum DevicePatchService {
                     AppLog.shared.append("[PATCH] 1️⃣ Mở App Store, cài đặt app 'Apple Books' (Sách) nếu chưa có.")
                     AppLog.shared.append("[PATCH] 2️⃣ Mở app 'Sách' lên 1 lần để hệ thống kích hoạt AirTraffic.")
                     AppLog.shared.append("[PATCH] 3️⃣ Quay lại PROXY VIP VN và nhấn patch lại.")
-                } else if errStr.contains("Connection refused") || errStr.contains("timeout") || errStr.contains("49152") {
+                    throw PatchPackageError.message("Cần mở app 'Sách' (Apple Books) trên iPhone 1 lần rồi thử bật lại patch.")
+                } else if errStr.contains("Connection refused") || errStr.contains("49152") {
                     AppLog.shared.append("[PATCH] 💡 HƯỚNG DẪN XỬ LÝ LỖI KẾT NỐI:")
                     AppLog.shared.append("[PATCH] 1️⃣ Mở app LocalDevVPN và bấm CONNECT (10.7.0.1).")
                     AppLog.shared.append("[PATCH] 2️⃣ Đảm bảo iPhone đang kết nối cùng mạng Wi-Fi.")
+                    throw PatchPackageError.message("Chưa kết nối RSD tunnel. Hãy mở app LocalDevVPN và bấm CONNECT (10.7.0.1).")
+                } else if errStr.contains("timeout") || (error as NSError).code == 408 {
+                    throw PatchPackageError.message("Quá thời gian kết nối AirTraffic. Hãy kiểm tra VPN và mở app Sách.")
+                } else {
+                    throw PatchPackageError.message("Airlift ghi thất bại: \(errStr)")
                 }
-                // Fall through to Tier 3
             }
         }
 
@@ -320,7 +345,7 @@ enum DevicePatchService {
         do {
             try withResolvedContainers(bundleIDs: [targetBundleID]) { roots in
                 guard let root = roots[targetBundleID] else {
-                    throw PatchPackageError.targetAppUnavailable(targetBundleID)
+                    throw PatchPackageError.message("Không tìm thấy container cho \(targetBundleID)")
                 }
                 for rule in rules {
                     try PatchTransaction.setRuleState(isOn, rule: rule, containerRoot: root)
@@ -331,9 +356,11 @@ enum DevicePatchService {
             }
             logInfo("SUCCESS (Standard Transaction): \(isOn ? "Enabled" : "Disabled") \(rules.count) rules")
             return
+        } catch let err as PatchPackageError {
+            throw err
         } catch {
             logError("All tiers failed for \(targetBundleID): \(error.localizedDescription)")
-            throw PatchPackageError.applyFailed
+            throw PatchPackageError.message("Ghi file thất bại: \(error.localizedDescription)")
         }
     }
 
@@ -344,7 +371,12 @@ enum DevicePatchService {
     /// Read what's currently on disk for this rule and report whether it matches
     /// the replacement (`true`), the original (`false`), or neither (`nil`).
     static func currentRuleState(for rule: PatchRule) -> Bool? {
-        // 1. Kiểm tra trên disk thật nếu có quyền đọc container
+        // 1. Kiểm tra trạng thái đã lưu trong UserDefaults (Ưu tiên hàng đầu cho Jailed iOS với Airlift)
+        if let saved = UserDefaults.standard.object(forKey: "patch.rule_state.\(rule.id.uuidString)") as? Bool {
+            return saved
+        }
+
+        // 2. Kiểm tra trên disk thật nếu có quyền đọc container (TrollStore / Jailbreak)
         if let diskState = (try? withResolvedContainers(bundleIDs: [rule.bundleID]) { roots -> Bool? in
             guard let root = roots[rule.bundleID] else { return nil }
             return PatchTransaction.currentRuleState(rule: rule, containerRoot: root)
@@ -352,10 +384,6 @@ enum DevicePatchService {
             return diskState
         }
 
-        // 2. Fallback sang UserDefaults nếu chạy qua Airlift / RemotePairing không đọc ngược được container
-        if let saved = UserDefaults.standard.object(forKey: "patch.rule_state.\(rule.id.uuidString)") as? Bool {
-            return saved
-        }
         return false
     }
 

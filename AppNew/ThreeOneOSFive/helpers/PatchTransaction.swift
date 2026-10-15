@@ -646,11 +646,7 @@ enum PatchTransaction {
             }
             return nil
         } else {
-            // Target file does not exist on disk
-            if rule.originalData == nil {
-                // For VIP / new file rules, non-existence on disk represents the pristine original state (OFF)
-                return false
-            }
+            // Target file cannot be read from sandbox or does not exist
             return nil
         }
     }
