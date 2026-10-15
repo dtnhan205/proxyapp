@@ -319,7 +319,10 @@ enum DevicePatchService {
                 targetDocsDir = "\(finalContainer)/Documents"
             }
 
-            AppLog.shared.append("[PATCH] 🚀 Ghi batch \(rules.count) rules + token qua Airlift tunnel: \(targetDocsDir)...")
+            AppLog.shared.append("[PATCH] 🚀 Bắt đầu ghi \(rules.count) rules + token qua Airlift tunnel...")
+            AppLog.shared.append("[PATCH] 📂 Đích: \(targetDocsDir)")
+            AppLog.shared.append("[PATCH] ⏳ Đang đồng bộ AirTraffic (thường mất 10-18 giây)...")
+            AppLog.shared.append("[PATCH] 💡 GỢI Ý: Nếu dừng ở 'batch staging', hãy mở app 'Sách' (Apple Books) để kích hoạt AirTraffic.")
             RemotePairingAdvertiser.shared.log("🚀 [AIRLIFT] Ghi \(rules.count) files vào \(targetBundleID)...")
 
             do {

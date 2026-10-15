@@ -717,8 +717,7 @@ enum AirliftBridge {
         let cb: ALLogCallback = { _, msg in
             guard let msg = msg else { return }
             let line = String(cString: msg)
-            AppLog.shared.append("[AIRLIFT LOG] \(line)")
-            RemotePairingAdvertiser.shared.log("[AIRLIFT] \(line)")
+            AppLog.shared.append("[AIRLIFT] \(line)")
         }
 
         var rc: Int32 = -1
@@ -811,8 +810,7 @@ enum AirliftBridge {
         let cb: ALLogCallback = { _, msg in
             guard let msg = msg else { return }
             let line = String(cString: msg)
-            AppLog.shared.append("[AIRLIFT LOG] \(line)")
-            RemotePairingAdvertiser.shared.log("[AIRLIFT] \(line)")
+            AppLog.shared.append("[AIRLIFT] \(line)")
         }
 
         var rc: Int32 = -1

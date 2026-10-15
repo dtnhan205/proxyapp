@@ -131,6 +131,17 @@ struct GamePatchesView: View {
                             NeonReadout(text: "SYNC", tint: AppTheme.neonCyan)
                         }
                     }
+                    // Nút mở app Sách (Apple Books) để kích hoạt AirTraffic
+                    Button {
+                        if let url = URL(string: "ibooks://") {
+                            UIApplication.shared.open(url)
+                        }
+                    } label: {
+                        Image(systemName: "book.closed.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(AppTheme.neonLime)
+                    }
+
                     if PatchLogConfig.isEnabled {
                         // Toggle logging button
                         Button {
@@ -843,6 +854,22 @@ struct GamePatchesView: View {
                     .foregroundStyle(AppTheme.neonCyan)
                 Spacer()
                 Button {
+                    if let url = URL(string: "ibooks://") {
+                        UIApplication.shared.open(url)
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "book.fill")
+                        Text("Mở Sách")
+                            .font(.system(size: 10, weight: .bold))
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(AppTheme.neonLime.opacity(0.2))
+                    .foregroundStyle(AppTheme.neonLime)
+                    .cornerRadius(4)
+                }
+                Button {
                     var text = ""
                     text += "PROXY VIP VN Patch Log\n"
                     text += "iOS \(AppInfo.osVersion) (\(AppInfo.osBuild))\n"
@@ -900,7 +927,7 @@ struct GamePatchesView: View {
                 }
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: 280)
+        .frame(maxWidth: .infinity, maxHeight: 340)
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
             RoundedRectangle(cornerRadius: 8)
