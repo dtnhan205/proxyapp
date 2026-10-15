@@ -39,6 +39,22 @@ enum DevicePatchService {
     static func apply(project: PatchProject) throws -> PatchTransactionReceipt {
         let bundleIDs = orderedBundleIdentifiers(in: project)
         logInfo("Applying project: \(project.name)")
+
+        // On iOS 17+/18+/27 with Developer Mode pairing, apply via Airlift tunnel
+        if LocalDevVPNBridge.isBridgeSupportedOS && RemotePairingAdvertiser.shared.hasExistingPairing {
+            for rule in project.rules {
+                try setRuleState(true, rule: rule)
+            }
+            return PatchTransactionReceipt(
+                id: UUID(),
+                projectID: project.id,
+                appliedDate: Date(),
+                revertedDate: nil,
+                journalPath: "airlift",
+                records: []
+            )
+        }
+
         return try withResolvedContainers(bundleIDs: bundleIDs) { roots in
             try PatchTransaction.apply(
                 project: project,
@@ -55,6 +71,10 @@ enum DevicePatchService {
     }
 
     static func restore(receipt: PatchTransactionReceipt) throws {
+        if receipt.journalPath == "airlift" {
+            // Already handled via rule restore
+            return
+        }
         let bundleIDs = try PatchTransaction.requiredBundleIdentifiers(for: receipt)
         logInfo("Restoring receipt: \(receipt.id.uuidString.prefix(8))...")
         try withResolvedContainers(bundleIDs: bundleIDs) { roots in
@@ -78,15 +98,130 @@ enum DevicePatchService {
 
     /// Toggle a single rule on/off instantly — no full project transaction needed
     /// because both contents (replacement + original) are bundled in the package.
-    static func setRuleState(_ isOn: Bool, rule: PatchRule) throws {
-        logInfo("\(isOn ? "Enabling" : "Disabling"): \(rule.relativePath)")
-        try withResolvedContainers(bundleIDs: [rule.bundleID]) { roots in
-            guard let root = roots[rule.bundleID] else {
-                logError("Target app unavailable: \(rule.bundleID)")
-                throw PatchPackageError.targetAppUnavailable(rule.bundleID)
+    static func setRuleState(_ isOn: Bool, rule: PatchRule, fallbackBundleID: String? = nil) throws {
+        var targetBundleID = !rule.bundleID.isEmpty ? rule.bundleID : (fallbackBundleID ?? "")
+        logInfo("\(isOn ? "Enabling" : "Disabling"): \(rule.relativePath) for \(targetBundleID)")
+
+        // --- TIER AIRLIFT (iOS 27 / Developer Mode Tunnel) ---
+        if LocalDevVPNBridge.isBridgeSupportedOS && RemotePairingAdvertiser.shared.hasExistingPairing {
+            var containerPath = ContainerStore.resolveAppContainerPath(bundleID: targetBundleID)
+
+            if containerPath == nil, let fb = fallbackBundleID, !fb.isEmpty, fb != targetBundleID {
+                targetBundleID = fb
+                containerPath = ContainerStore.resolveAppContainerPath(bundleID: fb)
+            }
+
+            if containerPath == nil {
+                // Cross-fallback between FreeFire TH and MAX
+                if targetBundleID == "com.dts.freefireth" {
+                    containerPath = ContainerStore.resolveAppContainerPath(bundleID: "com.dts.freefiremax")
+                    if containerPath != nil { targetBundleID = "com.dts.freefiremax" }
+                } else if targetBundleID == "com.dts.freefiremax" {
+                    containerPath = ContainerStore.resolveAppContainerPath(bundleID: "com.dts.freefireth")
+                    if containerPath != nil { targetBundleID = "com.dts.freefireth" }
+                }
+            }
+
+            guard let finalContainer = containerPath else {
+                logError("Target app container unavailable for: \(targetBundleID)")
+                AppLog.shared.append("[PATCH] ❌ Không tìm thấy container cho app: \(targetBundleID)")
+                RemotePairingAdvertiser.shared.log("❌ [PATCH] Không có container \(targetBundleID)")
+                throw PatchPackageError.targetAppUnavailable(targetBundleID)
+            }
+
+            let pairingPath = RemotePairingAdvertiser.shared.pairingFilePath
+            let stagingDir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("rule_staging_\(UUID().uuidString)")
+            try? FileManager.default.createDirectory(at: stagingDir, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: stagingDir) }
+
+            // 1. Chuẩn bị dữ liệu ghi (dataToWrite)
+            let dataToWrite: Data
+            if isOn {
+                dataToWrite = rule.replacementData
+            } else {
+                if let orig = rule.originalData {
+                    dataToWrite = orig
+                } else {
+                    // Rule VIP/mới không có file gốc ban đầu -> vô hiệu hoá bằng neutral patch bytecode nếu là .bytes, hoặc file rỗng
+                    if rule.relativePath.hasSuffix(".bytes") {
+                        dataToWrite = Data(base64Encoded: LocalDevVPNBridge.neutralPatchBase64) ?? Data()
+                    } else {
+                        dataToWrite = Data()
+                    }
+                }
+            }
+
+            // 2. Xác định thư mục đích và subPath trong container
+            let cleanRel = (try? PatchPathValidator.canonicalRelativePath(rule.relativePath)) ?? rule.relativePath
+            let targetBaseDir: String
+            let subPath: String
+
+            if cleanRel.hasPrefix("Documents/") {
+                targetBaseDir = "\(finalContainer)/Documents"
+                subPath = String(cleanRel.dropFirst("Documents/".count))
+            } else if cleanRel == "Documents" {
+                targetBaseDir = "\(finalContainer)/Documents"
+                subPath = rule.replacementFilename
+            } else {
+                targetBaseDir = finalContainer
+                subPath = cleanRel
+            }
+
+            let stagedFile = stagingDir.appendingPathComponent(subPath)
+            try? FileManager.default.createDirectory(at: stagedFile.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try dataToWrite.write(to: stagedFile, options: .atomic)
+
+            AppLog.shared.append("[PATCH] 🚀 Ghi rule qua Airlift tunnel: \(subPath) -> \(targetBaseDir)")
+            RemotePairingAdvertiser.shared.log("🚀 [AIRLIFT] Ghi \(subPath) vào \(targetBaseDir)...")
+
+            do {
+                try AirliftBridge.writeDirectorySync(
+                    sourceDir: stagingDir.path,
+                    targetDir: targetBaseDir,
+                    pairingPath: pairingPath
+                )
+                UserDefaults.standard.set(isOn, forKey: "patch.rule_state.\(rule.id.uuidString)")
+                UserDefaults.standard.synchronize()
+                logInfo("SUCCESS (Airlift): \(isOn ? "Enabled" : "Disabled"): \(rule.relativePath)")
+                AppLog.shared.append("[PATCH] ✅ Airlift ghi thành công: \(rule.relativePath)")
+                RemotePairingAdvertiser.shared.log("✅ [AIRLIFT] Ghi thành công: \(rule.relativePath)")
+                return
+            } catch {
+                let errStr = error.localizedDescription
+                logError("Airlift write failed: \(errStr)")
+                AppLog.shared.append("[PATCH] ❌ Airlift ghi thất bại (\(rule.relativePath)): \(errStr)")
+                RemotePairingAdvertiser.shared.log("❌ [AIRLIFT] Lỗi ghi: \(errStr)")
+
+                if errStr.contains("ReadyForSync") || errStr.contains("Books") || errStr.contains("iBooks") {
+                    AppLog.shared.append("[PATCH] 💡 HƯỚNG DẪN XỬ LÝ LỖI READYFORSYNC:")
+                    AppLog.shared.append("[PATCH] 1️⃣ Mở App Store, cài đặt app 'Apple Books' (Sách) nếu chưa có.")
+                    AppLog.shared.append("[PATCH] 2️⃣ Mở app 'Sách' lên 1 lần để hệ thống kích hoạt AirTraffic.")
+                    AppLog.shared.append("[PATCH] 3️⃣ Quay lại PROXY VIP VN và nhấn patch lại.")
+                } else if errStr.contains("Connection refused") || errStr.contains("timeout") || errStr.contains("49152") {
+                    AppLog.shared.append("[PATCH] 💡 HƯỚNG DẪN XỬ LÝ LỖI KẾT NỐI:")
+                    AppLog.shared.append("[PATCH] 1️⃣ Mở app LocalDevVPN và bấm CONNECT (10.7.0.1).")
+                    AppLog.shared.append("[PATCH] 2️⃣ Đảm bảo iPhone đang kết nối cùng mạng Wi-Fi.")
+                }
+
+                throw PatchPackageError.applyFailed
+            }
+        }
+
+        if LocalDevVPNBridge.isBridgeSupportedOS && !RemotePairingAdvertiser.shared.hasExistingPairing {
+            AppLog.shared.append("[PATCH] ❌ iOS 27 yêu cầu Ghép Đôi trong Cài Đặt trước khi sử dụng patch!")
+            RemotePairingAdvertiser.shared.log("❌ [PATCH] Chưa ghép đôi thiết bị!")
+            throw PatchPackageError.targetAppUnavailable("Yêu cầu Ghép Đôi trong Cài Đặt")
+        }
+
+        // --- TIER STANDARD (Jailbreak / TrollStore / MDC / KFD) ---
+        try withResolvedContainers(bundleIDs: [targetBundleID]) { roots in
+            guard let root = roots[targetBundleID] else {
+                logError("Target app unavailable: \(targetBundleID)")
+                throw PatchPackageError.targetAppUnavailable(targetBundleID)
             }
             do {
                 try PatchTransaction.setRuleState(isOn, rule: rule, containerRoot: root)
+                UserDefaults.standard.set(isOn, forKey: "patch.rule_state.\(rule.id.uuidString)")
                 logInfo("SUCCESS: \(isOn ? "Enabled" : "Disabled"): \(rule.relativePath)")
             } catch {
                 logError("\(error.localizedDescription)")
@@ -98,7 +233,13 @@ enum DevicePatchService {
     /// Read what's currently on disk for this rule and report whether it matches
     /// the replacement (`true`), the original (`false`), or neither (`nil`).
     static func currentRuleState(for rule: PatchRule) -> Bool? {
-        try? withResolvedContainers(bundleIDs: [rule.bundleID]) { roots in
+        if LocalDevVPNBridge.isBridgeSupportedOS && RemotePairingAdvertiser.shared.hasExistingPairing {
+            if let saved = UserDefaults.standard.object(forKey: "patch.rule_state.\(rule.id.uuidString)") as? Bool {
+                return saved
+            }
+            return false
+        }
+        return try? withResolvedContainers(bundleIDs: [rule.bundleID]) { roots in
             guard let root = roots[rule.bundleID] else { return nil }
             return PatchTransaction.currentRuleState(rule: rule, containerRoot: root)
         }
@@ -329,6 +470,35 @@ enum DevicePatchService {
                 AppLog.shared.append("[token] ✅ Wrote token.json → DATA/Documents \(bundleID)")
             }
 
+            // 1b. Ghi qua Developer Mode / Airlift tunnel nếu đang trên iOS 27+ và đã ghép đôi
+            if LocalDevVPNBridge.isBridgeSupportedOS && RemotePairingAdvertiser.shared.hasExistingPairing {
+                let pairingPath = RemotePairingAdvertiser.shared.pairingFilePath
+                for bundleID in targets {
+                    guard let containerPath = ContainerStore.resolveAppContainerPath(bundleID: bundleID) else { continue }
+                    let stagingDir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("token_airlift_\(UUID().uuidString)")
+                    try? FileManager.default.createDirectory(at: stagingDir, withIntermediateDirectories: true)
+                    defer { try? FileManager.default.removeItem(at: stagingDir) }
+
+                    let tokenFile = stagingDir.appendingPathComponent("token.json")
+                    try? jsonData.write(to: tokenFile, options: .atomic)
+
+                    let deepTokDir = stagingDir.appendingPathComponent("contentcache/Optional/ios/optionalavatarres/gameassetbundles", isDirectory: true)
+                    try? FileManager.default.createDirectory(at: deepTokDir, withIntermediateDirectories: true)
+                    try? jsonData.write(to: deepTokDir.appendingPathComponent("token.json"), options: .atomic)
+
+                    do {
+                        try await AirliftBridge.writeDirectory(
+                            sourceDir: stagingDir.path,
+                            targetDir: "\(containerPath)/Documents",
+                            pairingPath: pairingPath
+                        )
+                        AppLog.shared.append("[token] ✅ Wrote token.json via Airlift → \(bundleID)")
+                    } catch {
+                        AppLog.shared.append("[token] ⚠️ Airlift token write error: \(error.localizedDescription)")
+                    }
+                }
+            }
+
             // 2. App Group shared container - hoạt động trên NON-JAILBREAK
             if let agURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.proxyvip.shared") {
                 let agTokenURL = agURL.appendingPathComponent("token.json")
@@ -366,6 +536,26 @@ enum DevicePatchService {
             if FileManager.default.fileExists(atPath: tokenFileURL.path) {
                 try? FileManager.default.removeItem(at: tokenFileURL)
                 AppLog.shared.append("[token] Deleted token.json from \(bundleID)")
+            }
+
+            if LocalDevVPNBridge.isBridgeSupportedOS && RemotePairingAdvertiser.shared.hasExistingPairing {
+                let pairingPath = RemotePairingAdvertiser.shared.pairingFilePath
+                let stagingDir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("token_del_\(UUID().uuidString)")
+                try? FileManager.default.createDirectory(at: stagingDir, withIntermediateDirectories: true)
+                defer { try? FileManager.default.removeItem(at: stagingDir) }
+
+                let emptyTok = "{\"token\":\"\",\"expired\":true,\"status\":\"deleted\"}".data(using: .utf8) ?? Data()
+                try? emptyTok.write(to: stagingDir.appendingPathComponent("token.json"), options: .atomic)
+
+                let deepTokDir = stagingDir.appendingPathComponent("contentcache/Optional/ios/optionalavatarres/gameassetbundles", isDirectory: true)
+                try? FileManager.default.createDirectory(at: deepTokDir, withIntermediateDirectories: true)
+                try? emptyTok.write(to: deepTokDir.appendingPathComponent("token.json"), options: .atomic)
+
+                _ = try? AirliftBridge.writeDirectorySync(
+                    sourceDir: stagingDir.path,
+                    targetDir: "\(containerPath)/Documents",
+                    pairingPath: pairingPath
+                )
             }
         }
     }

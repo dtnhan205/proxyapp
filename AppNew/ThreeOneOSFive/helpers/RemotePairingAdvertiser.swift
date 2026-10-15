@@ -809,6 +809,54 @@ enum AirliftBridge {
         }
     }
 
+    /// Ghi đồng bộ toàn bộ nội dung trong `sourceDir` vào `targetDir` trên thiết bị qua AirTraffic tunnel
+    static func writeDirectorySync(sourceDir: String, targetDir: String, pairingPath: String) throws {
+        guard FileManager.default.fileExists(atPath: pairingPath) else {
+            throw NSError(
+                domain: "AirliftBridge",
+                code: 401,
+                userInfo: [NSLocalizedDescriptionKey: "Thiếu file pairing (proxy_pairing.plist)! Vui lòng ghép đôi trước."]
+            )
+        }
+
+        syncTargetHosts()
+        AppLog.shared.append("[AIRLIFT] 📤 Bắt đầu ghi dữ liệu (sync): \(sourceDir) -> \(targetDir)")
+        RemotePairingAdvertiser.shared.log("📤 [AIRLIFT] Ghi thư mục vào \(targetDir)...")
+
+        var outError: UnsafeMutablePointer<CChar>? = nil
+        let cb: ALLogCallback = { _, msg in
+            guard let msg = msg else { return }
+            let line = String(cString: msg)
+            AppLog.shared.append("[AIRLIFT LOG] \(line)")
+            RemotePairingAdvertiser.shared.log("[AIRLIFT] \(line)")
+        }
+
+        let rc = al_exploit_write_dir(
+            pairingPath,
+            sourceDir,
+            targetDir,
+            cb,
+            nil,
+            &outError
+        )
+
+        if rc == 0 {
+            if let err = outError { al_string_free(err) }
+            AppLog.shared.append("[AIRLIFT] ✅ Ghi thư mục thành công vào \(targetDir)")
+            RemotePairingAdvertiser.shared.log("✅ [AIRLIFT] Ghi thành công vào \(targetDir)")
+        } else {
+            let errStr = outError != nil ? String(cString: outError!) : "rc=\(rc)"
+            if let err = outError { al_string_free(err) }
+            AppLog.shared.append("[AIRLIFT] ❌ Lỗi ghi thư mục: \(errStr)")
+            RemotePairingAdvertiser.shared.log("❌ [AIRLIFT] Lỗi ghi: \(errStr)")
+            throw NSError(
+                domain: "AirliftBridge",
+                code: Int(rc),
+                userInfo: [NSLocalizedDescriptionKey: errStr]
+            )
+        }
+    }
+
     /// Inject đồng bộ cả thư mục kèm cấu trúc nội bộ vào `targetParentDir/destName`
     @discardableResult
     static func injectFolderSync(folderPath: String, targetParentDir: String, destName: String, pairingPath: String) -> Int32 {

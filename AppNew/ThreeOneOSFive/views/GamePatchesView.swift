@@ -776,7 +776,7 @@ struct GamePatchesView: View {
             var failure: PatchPackageError?
             for rule in toggleableRules {
                 do {
-                    try DevicePatchService.setRuleState(isOn, rule: rule)
+                    try DevicePatchService.setRuleState(isOn, rule: rule, fallbackBundleID: game.bundleID)
                 } catch let error as PatchPackageError {
                     failure = error
                 } catch {
