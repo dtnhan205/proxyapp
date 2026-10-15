@@ -15,9 +15,51 @@ struct ThreeOneOSFiveApp: App {
 
     init() {
         setupLogCapture()
-        // Chạy ngay khi app mở. Mọi chỉnh sửa binary (đổi URL, hook
-        // Obfuscated, rebrand bundle ID, jailbreak) → kill.
+        // Kiểm tra toàn vẹn cơ bản khi khởi động
         IntegrityChecker.runStartupChecks()
+
+        // Khởi tạo Grappa dynamic symbol hooking và token generator
+        ALGrappaInit()
+
+        // Kết nối router log từ Rust Airlift / idevice vào nhật ký app
+        al_log_init({ _, msg in
+            guard let msg = msg else { return }
+            let line = String(cString: msg)
+            RemotePairingAdvertiser.shared.log(line)
+        }, nil)
+
+        // Ghi lại thông số chẩn đoán chi tiết vào log.txt để phân tích
+        Task { @MainActor in
+            AppLog.shared.append("[DIAGNOSTIC] ══════════════════════════════════════════════════════════")
+            AppLog.shared.append("[DIAGNOSTIC] 📱 Thiết bị: \(AppInfo.hardwareDisplayName) (\(AppInfo.machineName))")
+            AppLog.shared.append("[DIAGNOSTIC] 🍎 iOS: \(AppInfo.osVersion) · Build: \(AppInfo.osBuild)")
+            let hasPairing = RemotePairingAdvertiser.shared.hasExistingPairing
+            let pairingPath = RemotePairingAdvertiser.shared.pairingFilePath
+            let pairingSize = (try? FileManager.default.attributesOfItem(atPath: pairingPath)[.size] as? Int) ?? 0
+            AppLog.shared.append("[DIAGNOSTIC] 📁 File Pairing: \(hasPairing ? "✅ CÓ SẴN (\(pairingSize) bytes)" : "⚠️ Chưa có file pairing")")
+            let booksInstalled = UIApplication.shared.canOpenURL(URL(string: "ibooks://")!)
+            AppLog.shared.append("[DIAGNOSTIC] 📚 Ứng dụng Sách (Apple Books): \(booksInstalled ? "✅ ĐÃ CÀI ĐẶT TRÊN MÁY" : "⚠️ CHƯA PHÁT HIỆN / CẦN CÀI TỪ APP STORE")")
+            let vpn = LocalDevVPNBridge.detectVPNInterface()
+            AppLog.shared.append("[DIAGNOSTIC] 🌐 LocalDevVPN (utun): \(vpn.active ? "✅ BẬT (\(vpn.deviceIP))" : "ℹ️ Chưa kết nối")")
+
+            var testLen: Int = 0
+            var testBuf = [UInt8](repeating: 0, count: 512)
+            let directRc = ALGetGrappaToken(1, 0, 1, &testBuf, 512, &testLen, nil, 0)
+            AppLog.shared.append("[DIAGNOSTIC] 🛡️ ALGetGrappaToken trực tiếp: rc=\(directRc), token=\(testLen) bytes")
+
+            let grappaSym = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "ALGetGrappaToken")
+            let mainHandle = dlopen(nil, RTLD_NOW)
+            let mainSym = mainHandle != nil ? dlsym(mainHandle, "ALGetGrappaToken") : nil
+
+            if grappaSym != nil {
+                AppLog.shared.append("[DIAGNOSTIC] 🛡️ ALGetGrappaToken dynamic export (RTLD_DEFAULT): ✅ SẴN SÀNG CHO AIRTRAFFIC")
+            } else if mainSym != nil {
+                AppLog.shared.append("[DIAGNOSTIC] 🛡️ ALGetGrappaToken dynamic export (main): ✅ TÌM THẤY TRONG MAIN BUNDLE")
+            } else {
+                AppLog.shared.append("[DIAGNOSTIC] 🛡️ ALGetGrappaToken dynamic export: ⚠️ Chưa tìm thấy qua dlsym")
+            }
+            AppLog.shared.append("[DIAGNOSTIC] ══════════════════════════════════════════════════════════")
+        }
     }
 
     var body: some Scene {

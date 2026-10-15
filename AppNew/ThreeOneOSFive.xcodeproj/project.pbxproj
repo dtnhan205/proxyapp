@@ -573,16 +573,27 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/Frameworks/AirliftFFI.xcframework/ios-arm64",
 				);
+				DEAD_CODE_STRIPPING = NO;
+				EXPORTED_SYMBOLS_FILE = "ThreeOneOSFive/exported_symbols.txt";
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-lz",
 					"-lc++",
 					"-lairlift_ffi",
 					"-rdynamic",
-					"-Wl,-export_dynamic",
-					"-Wl,-u,_ALGetGrappaToken",
-					"-Wl,-exported_symbol,_ALGetGrappaToken",
+					"-Xlinker",
+					"-export_dynamic",
+					"-Xlinker",
+					"-u",
+					"-Xlinker",
+					"_ALGetGrappaToken",
+					"-Xlinker",
+					"-exported_symbol",
+					"-Xlinker",
+					"_ALGetGrappaToken",
 				);
+				STRIP_INSTALLED_PRODUCT = NO;
+				STRIP_STYLE = "non-global";
 				PRODUCT_BUNDLE_IDENTIFIER = "com.apple.mobile.MobileHouseArrest";
 				PRODUCT_NAME = "ProxyVipVn";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -624,16 +635,27 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/Frameworks/AirliftFFI.xcframework/ios-arm64",
 				);
+				DEAD_CODE_STRIPPING = NO;
+				EXPORTED_SYMBOLS_FILE = "ThreeOneOSFive/exported_symbols.txt";
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-lz",
 					"-lc++",
 					"-lairlift_ffi",
 					"-rdynamic",
-					"-Wl,-export_dynamic",
-					"-Wl,-u,_ALGetGrappaToken",
-					"-Wl,-exported_symbol,_ALGetGrappaToken",
+					"-Xlinker",
+					"-export_dynamic",
+					"-Xlinker",
+					"-u",
+					"-Xlinker",
+					"_ALGetGrappaToken",
+					"-Xlinker",
+					"-exported_symbol",
+					"-Xlinker",
+					"_ALGetGrappaToken",
 				);
+				STRIP_INSTALLED_PRODUCT = NO;
+				STRIP_STYLE = "non-global";
 				PRODUCT_BUNDLE_IDENTIFIER = "com.apple.mobile.MobileHouseArrest";
 				PRODUCT_NAME = "ProxyVipVn";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -740,6 +762,8 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				STRIP_INSTALLED_PRODUCT = NO;
+				STRIP_STYLE = "non-global";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;

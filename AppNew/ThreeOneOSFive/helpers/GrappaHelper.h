@@ -8,6 +8,9 @@
 extern "C" {
 #endif
 
+/// Explicit initialization to rebind dlsym and ensure runtime symbol availability.
+void ALGrappaInit(void);
+
 /// Generates an authentic Grappa client token for AirTraffic sync.
 /// Returns 0 on success, or a negative error code on failure.
 __attribute__((visibility("default"), used, noinline))

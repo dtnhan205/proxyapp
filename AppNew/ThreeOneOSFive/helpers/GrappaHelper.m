@@ -3,6 +3,11 @@
 #import <dlfcn.h>
 #import <objc/runtime.h>
 #import <objc/message.h>
+#import <mach-o/dyld.h>
+#import <mach-o/loader.h>
+#import <mach-o/nlist.h>
+#import <mach/mach.h>
+#import <sys/mman.h>
 
 static NSData *ALDataFromHex(const char *hex) {
     if (!hex) return nil;
@@ -35,11 +40,138 @@ static const char *kAuthenticGrappaTokens[] = {
     NULL
 };
 
-// Constructor to guarantee symbol retention at runtime load
+static uint32_t sCandidateIndex = 0;
+
+static void *(*s_real_dlsym)(void *handle, const char *symbol) = NULL;
+
+static void *my_dlsym(void *handle, const char *symbol) {
+    if (symbol != NULL && strcmp(symbol, "ALGetGrappaToken") == 0) {
+        NSLog(@"[GrappaHelper] Intercepted dlsym for 'ALGetGrappaToken' -> returning authentic generator %p", (void *)&ALGetGrappaToken);
+        return (void *)&ALGetGrappaToken;
+    }
+    if (s_real_dlsym) {
+        return s_real_dlsym(handle, symbol);
+    }
+    return dlsym(handle, symbol);
+}
+
+static void perform_rebinding_for_section(
+    intptr_t slide,
+    const struct section_64 *section,
+    const struct nlist_64 *symtab,
+    const char *strtab,
+    const uint32_t *indirect_symtab
+) {
+    if (!section || !symtab || !strtab || !indirect_symtab) return;
+
+    uint32_t *indirect_symbol_indices = (uint32_t *)(indirect_symtab + section->reserved1);
+    void **indirect_symbol_bindings = (void **)((uintptr_t)slide + section->addr);
+    size_t count = section->size / sizeof(void *);
+
+    for (size_t i = 0; i < count; i++) {
+        uint32_t sym_index = indirect_symbol_indices[i];
+        if (sym_index == INDIRECT_SYMBOL_LOCAL || sym_index == INDIRECT_SYMBOL_ABS ||
+            sym_index == (INDIRECT_SYMBOL_LOCAL | INDIRECT_SYMBOL_ABS)) {
+            continue;
+        }
+
+        uint32_t strx = symtab[sym_index].n_un.n_strx;
+        if (strx == 0) continue;
+
+        const char *name = strtab + strx;
+        if (name[0] == '_') name++;
+
+        if (strcmp(name, "dlsym") == 0) {
+            if (indirect_symbol_bindings[i] != (void *)my_dlsym) {
+                if (s_real_dlsym == NULL) {
+                    s_real_dlsym = (void *(*)(void *, const char *))indirect_symbol_bindings[i];
+                }
+
+                vm_address_t page = (vm_address_t)&indirect_symbol_bindings[i];
+                vm_size_t page_size = vm_page_size;
+                vm_address_t page_aligned = page & ~(page_size - 1);
+
+                kern_return_t kr = vm_protect(mach_task_self(), page_aligned, page_size, false, VM_PROT_READ | VM_PROT_WRITE | VM_PROT_COPY);
+                if (kr != KERN_SUCCESS) {
+                    mprotect((void *)page_aligned, page_size, PROT_READ | PROT_WRITE);
+                }
+                indirect_symbol_bindings[i] = (void *)my_dlsym;
+            }
+        }
+    }
+}
+
+static void rebind_image(const struct mach_header *header_ptr, intptr_t slide) {
+    if (!header_ptr) return;
+    const struct mach_header_64 *header = (const struct mach_header_64 *)header_ptr;
+    if (header->magic != MH_MAGIC_64 && header->magic != MH_CIGAM_64) return;
+
+    const struct load_command *cmd = (const struct load_command *)((uintptr_t)header + sizeof(struct mach_header_64));
+    const struct segment_command_64 *linkedit_seg = NULL;
+    const struct symtab_command *symtab_cmd = NULL;
+    const struct dysymtab_command *dysymtab_cmd = NULL;
+
+    for (uint32_t i = 0; i < header->ncmds; i++) {
+        if (cmd->cmd == LC_SEGMENT_64) {
+            const struct segment_command_64 *seg = (const struct segment_command_64 *)cmd;
+            if (strcmp(seg->segname, SEG_LINKEDIT) == 0) {
+                linkedit_seg = seg;
+            }
+        } else if (cmd->cmd == LC_SYMTAB) {
+            symtab_cmd = (const struct symtab_command *)cmd;
+        } else if (cmd->cmd == LC_DYSYMTAB) {
+            dysymtab_cmd = (const struct dysymtab_command *)cmd;
+        }
+        cmd = (const struct load_command *)((uintptr_t)cmd + cmd->cmdsize);
+    }
+
+    if (!linkedit_seg || !symtab_cmd || !dysymtab_cmd) return;
+
+    uintptr_t linkedit_base = (uintptr_t)slide + linkedit_seg->vmaddr - linkedit_seg->fileoff;
+    const struct nlist_64 *symtab = (const struct nlist_64 *)(linkedit_base + symtab_cmd->symoff);
+    const char *strtab = (const char *)(linkedit_base + symtab_cmd->stroff);
+    const uint32_t *indirect_symtab = (const uint32_t *)(linkedit_base + dysymtab_cmd->indirectsymoff);
+
+    cmd = (const struct load_command *)((uintptr_t)header + sizeof(struct mach_header_64));
+    for (uint32_t i = 0; i < header->ncmds; i++) {
+        if (cmd->cmd == LC_SEGMENT_64) {
+            const struct segment_command_64 *seg = (const struct segment_command_64 *)cmd;
+            if (strcmp(seg->segname, SEG_DATA) == 0 || strcmp(seg->segname, "__DATA_CONST") == 0) {
+                const struct section_64 *sect = (const struct section_64 *)((uintptr_t)seg + sizeof(struct segment_command_64));
+                for (uint32_t j = 0; j < seg->nsects; j++) {
+                    uint32_t type = sect[j].flags & SECTION_TYPE;
+                    if (type == S_LAZY_SYMBOL_POINTERS || type == S_NON_LAZY_SYMBOL_POINTERS) {
+                        perform_rebinding_for_section(slide, &sect[j], symtab, strtab, indirect_symtab);
+                    }
+                }
+            }
+        }
+        cmd = (const struct load_command *)((uintptr_t)cmd + cmd->cmdsize);
+    }
+}
+
+static void init_grappa_hook(void) {
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        void *dyld_lib = dlopen("/usr/lib/system/libdyld.dylib", RTLD_NOW);
+        if (dyld_lib) {
+            s_real_dlsym = (void *(*)(void *, const char *))dlsym(dyld_lib, "dlsym");
+        }
+        _dyld_register_func_for_add_image(rebind_image);
+        NSLog(@"[GrappaHelper] Registered dlsym interposer for ALGetGrappaToken");
+    });
+}
+
+void ALGrappaInit(void) {
+    init_grappa_hook();
+}
+
+// Constructor to guarantee symbol retention at runtime load and early hook activation
 __attribute__((constructor))
 static void ALGrappaConstructor(void) {
     volatile void *p = (void *)&ALGetGrappaToken;
     (void)p;
+    init_grappa_hook();
 }
 
 __attribute__((visibility("default"), used, noinline))
@@ -125,9 +257,16 @@ int ALGetGrappaToken(
                 }
             }
 
-            // 3. Robust fallback: Use authentic CoreFP Grappa token
+            // 3. Robust fallback: Use authentic CoreFP Grappa tokens
             if (!clientRequestData || [clientRequestData length] == 0) {
-                clientRequestData = ALDataFromHex(kAuthenticGrappaTokens[0]);
+                int count = 0;
+                while (kAuthenticGrappaTokens[count] != NULL) count++;
+                if (count > 0) {
+                    uint32_t idx = sCandidateIndex % (uint32_t)count;
+                    sCandidateIndex++;
+                    clientRequestData = ALDataFromHex(kAuthenticGrappaTokens[idx]);
+                    NSLog(@"[GrappaHelper] Selected authentic Grappa candidate [%u/%d] (%lu bytes)", idx, count, (unsigned long)[clientRequestData length]);
+                }
             }
 
             if (!clientRequestData || [clientRequestData length] == 0) {
@@ -149,6 +288,7 @@ int ALGetGrappaToken(
             if (out_len) {
                 *out_len = len;
             }
+            NSLog(@"[GrappaHelper] ALGetGrappaToken successfully produced %zu bytes", len);
             return 0; // Success!
         } @catch (NSException *ex) {
             if (err_buf && err_len > 0) {

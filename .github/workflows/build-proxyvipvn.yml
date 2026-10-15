@@ -161,4 +161,6 @@ jobs:
             lipo -info "$APP_DIR/ProxyVipVn" || true
             echo "=== Linked frameworks ==="
             otool -L "$APP_DIR/ProxyVipVn" | head -20
+            echo "=== Checking ALGetGrappaToken symbol in binary ==="
+            nm -gU "$APP_DIR/ProxyVipVn" | grep -i "ALGetGrappaToken" || true
           fi
