@@ -774,24 +774,19 @@ struct GamePatchesView: View {
             }
 
             var failure: PatchPackageError?
-            for rule in toggleableRules {
-                do {
-                    try DevicePatchService.setRuleState(isOn, rule: rule, fallbackBundleID: game.bundleID)
-                } catch let error as PatchPackageError {
-                    failure = error
-                } catch {
-                    failure = .applyFailed
-                }
+            do {
+                try DevicePatchService.setProjectRulesState(isOn, project: project, rules: toggleableRules, fallbackBundleID: game.bundleID)
+            } catch let error as PatchPackageError {
+                failure = error
+            } catch {
+                failure = .applyFailed
             }
-            // Re-read actual on-device state rather than assume success, since a partial
-            // failure partway through the loop would otherwise show a state that never
-            // really landed on every file.
+
+            // Re-read actual on-device state rather than assume success
             let actualState = toggleableRules.allSatisfy { DevicePatchService.currentRuleState(for: $0) == true }
             if actualState && isOn {
-                await DevicePatchService.writeGameSessionToken(targetBundleID: game.bundleID)
                 DevicePatchService.stopContinuousAntibanLoop()
             } else if !isOn {
-                DevicePatchService.deleteGameSessionToken(targetBundleID: game.bundleID)
                 DevicePatchService.cleanAntibanAndTelemetry(targetBundleID: game.bundleID)
                 DevicePatchService.startContinuousAntibanLoop(targetBundleID: game.bundleID)
             }

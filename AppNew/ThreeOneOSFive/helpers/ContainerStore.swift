@@ -61,32 +61,51 @@ enum ContainerStore {
         "com.apple.compass", "com.apple.Magnifier", "com.apple.DocumentsApp"
     ]
 
+    private static var cachedContainerPaths: [String: String] = [:]
+
     static func resolveAppContainerPath(bundleID: String) -> String? {
         guard (try? PatchPathValidator.canonicalBundleIdentifier(bundleID)) == bundleID else {
             return nil
         }
+
+        // 0. Cache check tức thì (~0ms)
+        if let cached = cachedContainerPaths[bundleID], isApplicationContainerPath(cached) {
+            return cached
+        }
+
+        // 1. Ưu tiên hàng đầu: LSApplicationProxy via appInfoForBundleID (Tức thì ~0ms, không phụ thuộc network/RSD)
+        let info = (appInfoForBundleID(bundleID) as? [String: Any]) ?? [:]
+        if let container = info["container"] as? String,
+           !container.isEmpty,
+           isApplicationContainerPath(container) {
+            log("patch: LSApplicationProxy resolved \(bundleID) -> \(container)")
+            cachedContainerPaths[bundleID] = container
+            return container
+        }
+
+        // 2. MobileContainerManager (MHA-C2 / TrollStore / Jailbreak)
         var lookupError: NSString?
         if let path = MCMActivateContainerPath(2, bundleID, false, &lookupError),
            isApplicationContainerPath(path) {
             log("patch: MHA-C2 resolved \(bundleID)")
+            cachedContainerPaths[bundleID] = path
             return path
         }
         let detail = lookupError.map(String.init) ?? "unavailable"
         log("patch: MHA-C2 could not resolve \(bundleID), detail=\(detail)")
 
-        // Fallback for iOS builds where MCM refuses to hand out sandbox
-        // tokens (e.g. iOS 18.1.x): scan the app-data root with the inode
-        // walk and read each container's MCM metadata plist directly. The
-        // raw reads only succeed when the sandbox escape is active.
+        // 3. Fallback: scan metadata container (khi có quyền truy cập sandbox)
         if let scanned = resolveAppContainerPathByMetadataScan(bundleID: bundleID) {
             log("patch: filesystem metadata scan resolved \(bundleID)")
+            cachedContainerPaths[bundleID] = scanned
             return scanned
         }
 
-        // Bổ sung cho iOS 18.7.x / 27: Dùng LocalDevVPN Bridge (hoàn toàn không can thiệp iOS khác)
+        // 4. Bổ sung cho iOS 18.7.x / 27: Dùng LocalDevVPN Bridge (chỉ gọi khi các cách tức thì trên không ra)
         if LocalDevVPNBridge.isBridgeSupportedOS {
             if let vpnPath = LocalDevVPNBridge.resolveContainerPath(bundleID: bundleID) {
                 log("patch: LocalDevVPN bridge resolved \(bundleID) -> \(vpnPath)")
+                cachedContainerPaths[bundleID] = vpnPath
                 return vpnPath
             }
         }

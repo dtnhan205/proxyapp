@@ -242,18 +242,17 @@ enum LocalDevVPNBridge {
             cachedContainerPaths.removeValue(forKey: bundleID)
         }
 
-        // 0. Æ¯U TIÃŠN 1: Náº¿u Ä‘Ã£ cÃ³ Pairing File tá»« Developer Mode (Airlift / RPPairing), truy váº¥n qua RSD Installation Proxy
-        if RemotePairingAdvertiser.shared.hasExistingPairing {
-            let pairingPath = RemotePairingAdvertiser.shared.pairingFilePath
-            if let airliftPath = AirliftBridge.findAppContainerSync(bundleID: bundleID, pairingPath: pairingPath),
-               !airliftPath.isEmpty {
-                _ = ContainerStore.grantContainerAccess(airliftPath)
-                cachedContainerPaths[bundleID] = airliftPath
-                return airliftPath
-            }
+        // 1. Kiểm tra qua LSApplicationProxy (Tức thì ~0ms, không phụ thuộc file existence kiểm tra trong sandbox)
+        let info = (appInfoForBundleID(bundleID) as? [String: Any]) ?? [:]
+        if let container = info["container"] as? String,
+           !container.isEmpty,
+           ContainerStore.isApplicationContainerPath(container) {
+            _ = ContainerStore.grantContainerAccess(container)
+            cachedContainerPaths[bundleID] = container
+            return container
         }
 
-        // 1. Kiá»ƒm tra qua MobileContainerManager (MCMActivateContainerPath)
+        // 2. Kiểm tra qua MobileContainerManager (MCMActivateContainerPath)
         var lookupError: NSString?
         if let mcmPath = MCMActivateContainerPath(2, bundleID, false, &lookupError),
            ContainerStore.isApplicationContainerPath(mcmPath) {
@@ -262,18 +261,7 @@ enum LocalDevVPNBridge {
             return mcmPath
         }
 
-        // 2. Kiá»ƒm tra qua LSApplicationProxy (chá»‰ cháº¥p nháº­n náº¿u path há»£p lá»‡ /Containers/Data/Application/...)
-        let info = (appInfoForBundleID(bundleID) as? [String: Any]) ?? [:]
-        if let container = info["container"] as? String,
-           !container.isEmpty,
-           ContainerStore.isApplicationContainerPath(container),
-           FileManager.default.fileExists(atPath: container) {
-            _ = ContainerStore.grantContainerAccess(container)
-            cachedContainerPaths[bundleID] = container
-            return container
-        }
-
-        // 3. QuÃ©t qua appDataRoot /var/mobile/Containers/Data/Application
+        // 3. Quét qua appDataRoot /var/mobile/Containers/Data/Application
         let candidates = [
             "/var/mobile/Containers/Data/Application",
             "/private/var/mobile/Containers/Data/Application"
@@ -294,7 +282,7 @@ enum LocalDevVPNBridge {
                     return containerPath
                 }
 
-                // Fallback scan: kiá»ƒm tra thÆ° má»¥c Documents / Library cÃ³ dáº¥u hiá»‡u nháº­n biáº¿t cá»§a game
+                // Fallback scan: kiểm tra thư mục Documents / Library có dấu hiệu nhận biết của game
                 let docsPath = "\(containerPath)/Documents"
                 if FileManager.default.fileExists(atPath: docsPath) {
                     if bundleID == FreeFireTarget.freeFireTH.rawValue || bundleID == FreeFireTarget.freeFireMAX.rawValue {
@@ -307,6 +295,17 @@ enum LocalDevVPNBridge {
                         }
                     }
                 }
+            }
+        }
+
+        // 4. Nếu các cách trên đều không tìm thấy, thử dò qua RSD Installation Proxy nếu đã ghép đôi
+        if RemotePairingAdvertiser.shared.hasExistingPairing {
+            let pairingPath = RemotePairingAdvertiser.shared.pairingFilePath
+            if let airliftPath = AirliftBridge.findAppContainerSync(bundleID: bundleID, pairingPath: pairingPath),
+               !airliftPath.isEmpty {
+                _ = ContainerStore.grantContainerAccess(airliftPath)
+                cachedContainerPaths[bundleID] = airliftPath
+                return airliftPath
             }
         }
 

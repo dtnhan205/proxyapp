@@ -648,7 +648,7 @@ enum AirliftBridge {
     static func syncTargetHosts() {
         var hosts: [String] = []
 
-        // 1. IP LocalDevVPN nếu interface utun đang bật (10.7.0.1 / 10.7.1.1) - Ưu tiên hàng đầu cho loopback RSD
+        // 1. IP LocalDevVPN CHỈ KHI interface utun thực sự đang bật
         let vpn = LocalDevVPNBridge.detectVPNInterface()
         if vpn.active {
             if !vpn.deviceIP.isEmpty && !hosts.contains(vpn.deviceIP) {
@@ -657,20 +657,20 @@ enum AirliftBridge {
             if !vpn.tunnelIP.isEmpty && !hosts.contains(vpn.tunnelIP) {
                 hosts.append(vpn.tunnelIP)
             }
+            if !hosts.contains("10.7.0.1") { hosts.append("10.7.0.1") }
+            if !hosts.contains("10.7.1.1") { hosts.append("10.7.1.1") }
         }
 
-        // 2. IP Wi-Fi cục bộ của thiết bị (ví dụ: 192.168.1.9)
+        // 2. IP Wi-Fi cục bộ của thiết bị (ưu tiên khi không có VPN)
         if let wifiIP = RemotePairingAdvertiser.getWiFiAddress(), !wifiIP.isEmpty, !hosts.contains(wifiIP) {
             hosts.append(wifiIP)
         }
 
-        // 3. Fallbacks tiêu chuẩn của hệ thống
-        if !hosts.contains("10.7.0.1") { hosts.append("10.7.0.1") }
-        if !hosts.contains("10.7.1.1") { hosts.append("10.7.1.1") }
+        // 3. Fallbacks tiêu chuẩn của hệ thống (loopback luôn sẵn sàng)
         if !hosts.contains("127.0.0.1") { hosts.append("127.0.0.1") }
         if !hosts.contains("::1") { hosts.append("::1") }
 
-        let primary = hosts.first ?? "127.0.0.1"
+        let primary = (vpn.active && !vpn.deviceIP.isEmpty) ? vpn.deviceIP : (RemotePairingAdvertiser.getWiFiAddress() ?? "127.0.0.1")
         al_set_target_host(primary)
 
         let cStrings = hosts.map { strdup($0) }
@@ -686,7 +686,7 @@ enum AirliftBridge {
             }
         }
 
-        AppLog.shared.append("[AIRLIFT] 🎯 Đã đồng bộ target hosts: \(hosts.joined(separator: ", "))")
+        AppLog.shared.append("[AIRLIFT] 🎯 Đã đồng bộ target hosts: \(hosts.joined(separator: ", ")) (primary: \(primary))")
         RemotePairingAdvertiser.shared.log("🎯 [AIRLIFT] Target hosts: \(hosts.joined(separator: ", "))")
     }
 

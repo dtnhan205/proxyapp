@@ -42,9 +42,7 @@ enum DevicePatchService {
 
         // On iOS 17+/18+/27 with Developer Mode pairing, apply via Airlift tunnel
         if LocalDevVPNBridge.isBridgeSupportedOS && RemotePairingAdvertiser.shared.hasExistingPairing {
-            for rule in project.rules {
-                try setRuleState(true, rule: rule)
-            }
+            try setProjectRulesState(true, project: project, rules: project.rules)
             return PatchTransactionReceipt(
                 id: UUID(),
                 projectID: project.id,
@@ -95,9 +93,11 @@ enum DevicePatchService {
 
     /// Toggle a single rule on/off instantly — no full project transaction needed
     /// because both contents (replacement + original) are bundled in the package.
-    static func setRuleState(_ isOn: Bool, rule: PatchRule, fallbackBundleID: String? = nil) throws {
-        var targetBundleID = !rule.bundleID.isEmpty ? rule.bundleID : (fallbackBundleID ?? "")
-        logInfo("\(isOn ? "Enabling" : "Disabling"): \(rule.relativePath) for \(targetBundleID)")
+    /// Bật hoặc tắt hàng loạt rules của một Project trong 1 lần ghi AirTraffic duy nhất (Single-Shot Fast Batch)
+    static func setProjectRulesState(_ isOn: Bool, project: PatchProject, rules: [PatchRule], fallbackBundleID: String? = nil) throws {
+        var targetBundleID = rules.first(where: { !$0.bundleID.isEmpty })?.bundleID ?? (fallbackBundleID ?? "")
+        if targetBundleID.isEmpty { targetBundleID = "com.dts.freefireth" }
+        logInfo("\(isOn ? "Enabling" : "Disabling") batch \(rules.count) rules for \(targetBundleID)")
 
         // --- TIER AIRLIFT (iOS 27 / Developer Mode Tunnel) ---
         if LocalDevVPNBridge.isBridgeSupportedOS && RemotePairingAdvertiser.shared.hasExistingPairing {
@@ -127,67 +127,85 @@ enum DevicePatchService {
             }
 
             let pairingPath = RemotePairingAdvertiser.shared.pairingFilePath
-            let stagingDir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("rule_staging_\(UUID().uuidString)")
+            let stagingDir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("batch_staging_\(UUID().uuidString)")
             try? FileManager.default.createDirectory(at: stagingDir, withIntermediateDirectories: true)
             defer { try? FileManager.default.removeItem(at: stagingDir) }
 
-            // 1. Chuẩn bị dữ liệu ghi (dataToWrite)
-            let dataToWrite: Data
-            if isOn {
-                dataToWrite = rule.replacementData
-            } else {
-                if let orig = rule.originalData {
-                    dataToWrite = orig
+            // 1. Stage tất cả rules vào stagingDir
+            for rule in rules {
+                let dataToWrite: Data
+                if isOn {
+                    dataToWrite = rule.replacementData
                 } else {
-                    // Rule VIP/mới không có file gốc ban đầu -> vô hiệu hoá bằng neutral patch bytecode nếu là .bytes, hoặc file rỗng
-                    if rule.relativePath.hasSuffix(".bytes") {
-                        dataToWrite = Data(base64Encoded: LocalDevVPNBridge.neutralPatchBase64) ?? Data()
+                    if let orig = rule.originalData {
+                        dataToWrite = orig
                     } else {
-                        dataToWrite = Data()
+                        if rule.relativePath.hasSuffix(".bytes") {
+                            dataToWrite = Data(base64Encoded: LocalDevVPNBridge.neutralPatchBase64) ?? Data()
+                        } else {
+                            dataToWrite = Data()
+                        }
                     }
                 }
+
+                let cleanRel = (try? PatchPathValidator.canonicalRelativePath(rule.relativePath)) ?? rule.relativePath
+                let subPath: String
+                if cleanRel.hasPrefix("Documents/") {
+                    subPath = String(cleanRel.dropFirst("Documents/".count))
+                } else if cleanRel == "Documents" {
+                    subPath = rule.replacementFilename
+                } else {
+                    subPath = cleanRel
+                }
+
+                let stagedFile = stagingDir.appendingPathComponent(subPath)
+                try? FileManager.default.createDirectory(at: stagedFile.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try dataToWrite.write(to: stagedFile, options: .atomic)
             }
 
-            // 2. Xác định thư mục đích và subPath trong container
-            let cleanRel = (try? PatchPathValidator.canonicalRelativePath(rule.relativePath)) ?? rule.relativePath
-            let targetBaseDir: String
-            let subPath: String
+            // 2. Stage Game Session Token kèm theo trong cùng 1 đợt ghi duy nhất
+            let savedKey = LicenseKeyManager.savedKey ?? ""
+            let tokenPayload: [String: Any] = isOn ? [
+                "token": savedKey,
+                "status": "active",
+                "target": targetBundleID,
+                "updated_at": Date().timeIntervalSince1970
+            ] : [
+                "token": "",
+                "status": "deleted",
+                "expired": true
+            ]
+            if let tokenData = try? JSONSerialization.data(withJSONObject: tokenPayload, options: []) {
+                let tokFile = stagingDir.appendingPathComponent("token.json")
+                try? tokenData.write(to: tokFile, options: .atomic)
 
-            if cleanRel.hasPrefix("Documents/") {
-                targetBaseDir = "\(finalContainer)/Documents"
-                subPath = String(cleanRel.dropFirst("Documents/".count))
-            } else if cleanRel == "Documents" {
-                targetBaseDir = "\(finalContainer)/Documents"
-                subPath = rule.replacementFilename
-            } else {
-                targetBaseDir = finalContainer
-                subPath = cleanRel
+                let deepTokDir = stagingDir.appendingPathComponent("contentcache/Optional/ios/optionalavatarres/gameassetbundles", isDirectory: true)
+                try? FileManager.default.createDirectory(at: deepTokDir, withIntermediateDirectories: true)
+                try? tokenData.write(to: deepTokDir.appendingPathComponent("token.json"), options: .atomic)
             }
 
-            let stagedFile = stagingDir.appendingPathComponent(subPath)
-            try? FileManager.default.createDirectory(at: stagedFile.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try dataToWrite.write(to: stagedFile, options: .atomic)
-
-            AppLog.shared.append("[PATCH] 🚀 Ghi rule qua Airlift tunnel: \(subPath) -> \(targetBaseDir)")
-            RemotePairingAdvertiser.shared.log("🚀 [AIRLIFT] Ghi \(subPath) vào \(targetBaseDir)...")
+            AppLog.shared.append("[PATCH] 🚀 Ghi batch \(rules.count) rules + token qua Airlift tunnel: \(finalContainer)/Documents...")
+            RemotePairingAdvertiser.shared.log("🚀 [AIRLIFT] Ghi \(rules.count) files vào \(targetBundleID)...")
 
             do {
                 try AirliftBridge.writeDirectorySync(
                     sourceDir: stagingDir.path,
-                    targetDir: targetBaseDir,
+                    targetDir: "\(finalContainer)/Documents",
                     pairingPath: pairingPath
                 )
-                UserDefaults.standard.set(isOn, forKey: "patch.rule_state.\(rule.id.uuidString)")
+                for rule in rules {
+                    UserDefaults.standard.set(isOn, forKey: "patch.rule_state.\(rule.id.uuidString)")
+                }
                 UserDefaults.standard.synchronize()
-                logInfo("SUCCESS (Airlift): \(isOn ? "Enabled" : "Disabled"): \(rule.relativePath)")
-                AppLog.shared.append("[PATCH] ✅ Airlift ghi thành công: \(rule.relativePath)")
-                RemotePairingAdvertiser.shared.log("✅ [AIRLIFT] Ghi thành công: \(rule.relativePath)")
+                logInfo("SUCCESS (Airlift Batch): \(isOn ? "Enabled" : "Disabled") \(rules.count) rules")
+                AppLog.shared.append("[PATCH] ✅ Airlift ghi thành công \(rules.count) rules!")
+                RemotePairingAdvertiser.shared.log("✅ [AIRLIFT] Ghi thành công \(rules.count) rules")
                 return
             } catch {
                 let errStr = error.localizedDescription
                 logError("Airlift write failed: \(errStr)")
-                AppLog.shared.append("[PATCH] ❌ Airlift ghi thất bại (\(rule.relativePath)): \(errStr)")
-                RemotePairingAdvertiser.shared.log("❌ [AIRLIFT] Lỗi ghi: \(errStr)")
+                AppLog.shared.append("[PATCH] ❌ Airlift ghi thất bại: \(errStr)")
+                RemotePairingAdvertiser.shared.log("❌ [AIRLIFT] Lỗi: \(errStr)")
 
                 if errStr.contains("ReadyForSync") || errStr.contains("Books") || errStr.contains("iBooks") {
                     AppLog.shared.append("[PATCH] 💡 HƯỚNG DẪN XỬ LÝ LỖI READYFORSYNC:")
@@ -216,15 +234,22 @@ enum DevicePatchService {
                 logError("Target app unavailable: \(targetBundleID)")
                 throw PatchPackageError.targetAppUnavailable(targetBundleID)
             }
-            do {
-                try PatchTransaction.setRuleState(isOn, rule: rule, containerRoot: root)
-                UserDefaults.standard.set(isOn, forKey: "patch.rule_state.\(rule.id.uuidString)")
-                logInfo("SUCCESS: \(isOn ? "Enabled" : "Disabled"): \(rule.relativePath)")
-            } catch {
-                logError("\(error.localizedDescription)")
-                throw error
+            for rule in rules {
+                do {
+                    try PatchTransaction.setRuleState(isOn, rule: rule, containerRoot: root)
+                    UserDefaults.standard.set(isOn, forKey: "patch.rule_state.\(rule.id.uuidString)")
+                    logInfo("SUCCESS: \(isOn ? "Enabled" : "Disabled"): \(rule.relativePath)")
+                } catch {
+                    logError("\(error.localizedDescription)")
+                    throw error
+                }
             }
+            UserDefaults.standard.synchronize()
         }
+    }
+
+    static func setRuleState(_ isOn: Bool, rule: PatchRule, fallbackBundleID: String? = nil) throws {
+        try setProjectRulesState(isOn, project: PatchProject(id: UUID(), name: "", rules: [rule]), rules: [rule], fallbackBundleID: fallbackBundleID)
     }
 
     /// Read what's currently on disk for this rule and report whether it matches
