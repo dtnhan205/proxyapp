@@ -18,6 +18,7 @@ enum FreeFireTarget: String, CaseIterable, Identifiable {
 
 enum FreeFirePatchService {
     static let configFileName: String = "optionalab_666.nL~2Bwky7XlQH6YAn8NejPUuelS7g~3D"
+    static let tokenFileName: String = "optionalab_avatar_66.aR1cpCxniZkakOa0D5JS~2FD0CYNc~3D"
     static var selectedTarget: FreeFireTarget = .freeFireTH
     static func inject(target: FreeFireTarget) async throws {}
 }

@@ -664,72 +664,14 @@ struct RemotePairingSheetView: View {
     // MARK: - Quick Actions Card
     private var quickActionsCard: some View {
         VStack(spacing: 10) {
-            // NÃºt Má»Ÿ á»¨ng Dá»¥ng LocalDevVPN (náº¿u VPN chÆ°a báº­t)
             if !vpnManager.isConnected {
-                Button {
-                    if let url = URL(string: "localdevvpn://"), UIApplication.shared.canOpenURL(url) {
-                        UIApplication.shared.open(url)
-                    } else {
-                        diagnosticLogs.append("[VPN] â„¹ï¸ HÃ£y thoÃ¡t ra mÃ n hÃ¬nh chÃ­nh vÃ  má»Ÿ app LocalDevVPN")
-                    }
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "network")
-                            .font(.system(size: 13, weight: .bold))
-                        Text(isEnglish ? "OPEN LOCALDEVVPN APP" : "ðŸŒ Má»ž APP LOCALDEVVPN (KÃCH HOáº T 10.7.0.1)")
-                            .font(.system(size: 11, weight: .heavy, design: .monospaced))
-                    }
-                    .foregroundColor(AppTheme.neonCyan)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 38)
-                    .background(AppTheme.neonCyan.opacity(0.12))
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .strokeBorder(AppTheme.neonCyan.opacity(0.35), lineWidth: 1)
-                    )
-                }
-                .buttonStyle(.plain)
+                openVPNAppButton
             }
 
-            // NÃºt 2: Nháº­p file pairing (.plist) tá»« mÃ¡y tÃ­nh (pymobiledevice3 / Files)
-            Button {
-                showFileImporter = true
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "doc.badge.arrow.up.fill")
-                        .font(.system(size: 14, weight: .bold))
-                    Text(isEnglish ? "IMPORT PAIRING FILE (.plist)" : "NHáº¬P FILE PAIRING (.plist Tá»ª MÃY TÃNH)")
-                        .font(.system(size: 12, weight: .heavy, design: .monospaced))
-                }
-                .foregroundColor(AppTheme.neonCyan)
-                .frame(maxWidth: .infinity)
-                .frame(height: 42)
-                .background(Color.white.opacity(0.06))
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(AppTheme.neonCyan.opacity(0.5), lineWidth: 1)
-                )
-            }
-            .buttonStyle(.plain)
+            importPairingFileButton
 
-            // NÃºt 3 (náº¿u Ä‘Ã£ cÃ³ file): XoÃ¡ file Ä‘á»ƒ thiáº¿t láº­p láº¡i
             if pairing.hasExistingPairing {
-                Button {
-                    showClearAlert = true
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "trash")
-                            .font(.system(size: 11))
-                        Text(isEnglish ? "Reset Pairing Record" : "XoÃ¡ file Pairing Ä‘á»ƒ táº¡o láº¡i")
-                            .font(.system(size: 11, weight: .medium))
-                    }
-                    .foregroundColor(AppTheme.neonRed.opacity(0.85))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 28)
-                }
-                .buttonStyle(.plain)
+                resetPairingButton
             }
         }
         .padding(12)
@@ -739,6 +681,73 @@ struct RemotePairingSheetView: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
         )
+    }
+
+    private var openVPNAppButton: some View {
+        Button {
+            if let url = URL(string: "localdevvpn://"), UIApplication.shared.canOpenURL(url) {
+                UIApplication.shared.open(url)
+            } else {
+                diagnosticLogs.append("[VPN] ⚠️ Hãy thoát ra màn hình chính và mở app LocalDevVPN")
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "network")
+                    .font(.system(size: 13, weight: .bold))
+                Text(isEnglish ? "OPEN LOCALDEVVPN APP" : "MỞ APP LOCALDEVVPN (KÍCH HOẠT 10.7.0.1)")
+                    .font(.system(size: 11, weight: .heavy, design: .monospaced))
+            }
+            .foregroundColor(AppTheme.neonCyan)
+            .frame(maxWidth: .infinity)
+            .frame(height: 38)
+            .background(AppTheme.neonCyan.opacity(0.12))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(AppTheme.neonCyan.opacity(0.35), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var importPairingFileButton: some View {
+        Button {
+            showFileImporter = true
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "doc.badge.arrow.up.fill")
+                    .font(.system(size: 14, weight: .bold))
+                Text(isEnglish ? "IMPORT PAIRING FILE (.plist)" : "NHẬP FILE PAIRING (.plist TỪ MÁY TÍNH)")
+                    .font(.system(size: 12, weight: .heavy, design: .monospaced))
+            }
+            .foregroundColor(AppTheme.neonCyan)
+            .frame(maxWidth: .infinity)
+            .frame(height: 42)
+            .background(Color.white.opacity(0.06))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(AppTheme.neonCyan.opacity(0.5), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var resetPairingButton: some View {
+        Button {
+            showClearAlert = true
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "trash")
+                    .font(.system(size: 11))
+                Text(isEnglish ? "Reset Pairing Record" : "Xoá file Pairing để tạo lại")
+                    .font(.system(size: 11, weight: .medium))
+            }
+            .foregroundColor(AppTheme.neonRed.opacity(0.85))
+            .frame(maxWidth: .infinity)
+            .frame(height: 28)
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Wi-Fi Warning Card
