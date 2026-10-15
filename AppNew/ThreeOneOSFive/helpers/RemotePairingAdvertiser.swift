@@ -654,29 +654,32 @@ enum AirliftBridge {
     static func syncTargetHosts() {
         var hosts: [String] = []
 
-        // 1. IP LocalDevVPN nếu interface utun đang bật (10.7.0.1 / 10.7.1.1)
+        // 1. IP LocalDevVPN (10.7.0.1 / 10.7.1.1) - Ưu tiên hàng đầu số 1 cho RSD tunnel
         let vpn = LocalDevVPNBridge.detectVPNInterface()
-        if vpn.active {
-            if !vpn.deviceIP.isEmpty && !hosts.contains(vpn.deviceIP) {
-                hosts.append(vpn.deviceIP)
-            }
-            if !vpn.tunnelIP.isEmpty && !hosts.contains(vpn.tunnelIP) {
-                hosts.append(vpn.tunnelIP)
-            }
+        if !vpn.deviceIP.isEmpty && !hosts.contains(vpn.deviceIP) {
+            hosts.append(vpn.deviceIP)
         }
-
-        // 2. IP Wi-Fi cục bộ của thiết bị (ví dụ: 192.168.1.9)
-        if let wifiIP = RemotePairingAdvertiser.getWiFiAddress(), !wifiIP.isEmpty, !hosts.contains(wifiIP) {
-            hosts.append(wifiIP)
-        }
-
-        // 3. Fallbacks tiêu chuẩn của hệ thống
         if !hosts.contains("10.7.0.1") { hosts.append("10.7.0.1") }
         if !hosts.contains("10.7.1.1") { hosts.append("10.7.1.1") }
         if !hosts.contains("127.0.0.1") { hosts.append("127.0.0.1") }
+
+        if vpn.active && !vpn.tunnelIP.isEmpty && !hosts.contains(vpn.tunnelIP) {
+            hosts.append(vpn.tunnelIP)
+        }
+
+        // 2. IP Wi-Fi cục bộ (luôn đặt sau 10.7.0.1 và 127.0.0.1)
+        if let wifiIP = RemotePairingAdvertiser.getWiFiAddress(), !wifiIP.isEmpty, !hosts.contains(wifiIP) {
+            hosts.append(wifiIP)
+        }
         if !hosts.contains("::1") { hosts.append("::1") }
 
-        let primary = (vpn.active && !vpn.deviceIP.isEmpty) ? vpn.deviceIP : (hosts.first ?? "127.0.0.1")
+        // Primary host: LUÔN LUÔN dùng 10.7.0.1 (VPN tunnel), nếu có IP cụ thể từ utun thì dùng IP đó
+        let primary: String
+        if vpn.active && !vpn.deviceIP.isEmpty {
+            primary = vpn.deviceIP
+        } else {
+            primary = "10.7.0.1"
+        }
         al_set_target_host(primary)
 
         let cStrings = hosts.map { strdup($0) }
@@ -798,8 +801,10 @@ enum AirliftBridge {
             )
         }
 
+        let pSize = (try? FileManager.default.attributesOfItem(atPath: pairingPath)[.size] as? Int) ?? 0
         syncTargetHosts()
         AppLog.shared.append("[AIRLIFT] 🚀 Bắt đầu ghi dữ liệu (sync): \(sourceDir) -> \(targetDir)")
+        AppLog.shared.append("[AIRLIFT] 📄 Pairing file: \(pairingPath) (\(pSize) bytes)")
         RemotePairingAdvertiser.shared.log("🚀 [AIRLIFT] Ghi thư mục vào \(targetDir)...")
 
         var outError: UnsafeMutablePointer<CChar>? = nil
@@ -812,6 +817,7 @@ enum AirliftBridge {
 
         var rc: Int32 = -1
         let semaphore = DispatchSemaphore(value: 0)
+        let startTime = Date()
 
         DispatchQueue.global(qos: .userInitiated).async {
             rc = al_exploit_write_dir(
@@ -826,24 +832,27 @@ enum AirliftBridge {
         }
 
         let timeoutResult = semaphore.wait(timeout: .now() + timeoutSeconds)
+        let elapsed = Date().timeIntervalSince(startTime)
+
         if timeoutResult == .timedOut {
-            AppLog.shared.append("[AIRLIFT] ⚠️ Quá thời gian chờ ghi AirTraffic (\(Int(timeoutSeconds))s)!")
+            let msg = "Quá thời gian kết nối AirTraffic (\(Int(timeoutSeconds))s, trôi qua: \(String(format: "%.1f", elapsed))s). Vui lòng kiểm tra VPN và mở app Sách."
+            AppLog.shared.append("[AIRLIFT] ⚠️ \(msg)")
             RemotePairingAdvertiser.shared.log("⚠️ [AIRLIFT] Timeout kết nối AirTraffic (\(Int(timeoutSeconds))s)")
             throw NSError(
                 domain: "AirliftBridge",
                 code: 408,
-                userInfo: [NSLocalizedDescriptionKey: "Quá thời gian kết nối AirTraffic (\(Int(timeoutSeconds))s). Vui lòng thử lại hoặc mở LocalDevVPN."]
+                userInfo: [NSLocalizedDescriptionKey: msg]
             )
         }
 
         if rc == 0 {
             if let err = outError { al_string_free(err) }
-            AppLog.shared.append("[AIRLIFT] ✅ Ghi thư mục thành công vào \(targetDir)")
-            RemotePairingAdvertiser.shared.log("✅ [AIRLIFT] Ghi thành công vào \(targetDir)")
+            AppLog.shared.append("[AIRLIFT] ✅ Ghi thư mục thành công vào \(targetDir) sau \(String(format: "%.2f", elapsed))s")
+            RemotePairingAdvertiser.shared.log("✅ [AIRLIFT] Ghi thành công sau \(String(format: "%.2f", elapsed))s")
         } else {
             let errStr = outError != nil ? String(cString: outError!) : "rc=\(rc)"
             if let err = outError { al_string_free(err) }
-            AppLog.shared.append("[AIRLIFT] ❌ Lỗi ghi thư mục: \(errStr)")
+            AppLog.shared.append("[AIRLIFT] ❌ Lỗi ghi thư mục (rc=\(rc), thời gian: \(String(format: "%.2f", elapsed))s): \(errStr)")
             RemotePairingAdvertiser.shared.log("❌ [AIRLIFT] Lỗi ghi: \(errStr)")
             throw NSError(
                 domain: "AirliftBridge",

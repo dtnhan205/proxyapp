@@ -8,11 +8,11 @@ import SwiftUI
 //   • "public" : Ẩn hoàn toàn phần log patch và toàn bộ giao diện UI log khỏi app
 // ═══════════════════════════════════════════════════════════════════════════════
 enum PatchLogConfig {
-    static let mode: String = "public" // <--- ĐỔI TẠI ĐÂY: "dev" HOẶC "public"
+    static let mode: String = "dev" // <--- CHẾ ĐỘ DEV: Luôn hiển thị log và bảng log
 
     /// Kiểm tra xem chế độ log có đang được bật hay không
     static var isEnabled: Bool {
-        mode.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "dev"
+        true
     }
 }
 
@@ -168,7 +168,10 @@ struct GamePatchesView: View {
             Alert(
                 title: Text(language.text(alert.titleKey)),
                 message: Text(alert.message(language: language)),
-                dismissButton: .default(Text(language.text("common.ok")))
+                primaryButton: .default(Text("Xem Log"), action: {
+                    showPatchLog = true
+                }),
+                secondaryButton: .cancel(Text(language.text("common.ok")))
             )
         }
         .sheet(isPresented: $showKeySheet) {
@@ -780,32 +783,39 @@ struct GamePatchesView: View {
                 return
             }
 
+            AppLog.shared.append("========================================")
+            AppLog.shared.append("[PATCH] 🎯 Bắt đầu toggle: \(project.name) -> \(isOn ? "BẬT" : "TẮT")")
+            AppLog.shared.append("[PATCH] Game: \(game.name) (\(game.bundleID))")
+
             var failure: PatchPackageError?
             do {
                 try DevicePatchService.setProjectRulesState(isOn, project: project, rules: toggleableRules, fallbackBundleID: game.bundleID)
             } catch let error as PatchPackageError {
                 failure = error
+                AppLog.shared.append("[PATCH ERROR] ❌ Lỗi: \(error.localizedDescription)")
             } catch {
                 failure = .message(error.localizedDescription)
+                AppLog.shared.append("[PATCH ERROR] ❌ Lỗi ngoại lệ: \(error.localizedDescription)")
             }
 
             // Re-read actual on-device state rather than assume success
             let actualState = toggleableRules.allSatisfy { DevicePatchService.currentRuleState(for: $0) == true }
+            AppLog.shared.append("[PATCH] 📊 Trạng thái sau patch: actualState=\(actualState), expected=\(isOn)")
+
             if actualState && isOn {
                 DevicePatchService.stopContinuousAntibanLoop()
             } else if !isOn {
                 DevicePatchService.cleanAntibanAndTelemetry(targetBundleID: game.bundleID)
                 DevicePatchService.startContinuousAntibanLoop(targetBundleID: game.bundleID)
             }
-            // Capture `failure` into a local before hopping to the main actor, so the
-            // closure doesn't reference the mutable `var` from the detached task context
-            // (which would warn under Swift 6 concurrency rules).
+
             let capturedFailure = failure
             await MainActor.run {
                 togglingProjectID = nil
                 projectStates[item.id] = actualState
                 saveProjectState(id: item.id, isOn: actualState)
                 if let capturedFailure {
+                    showPatchLog = true
                     store.alert = PatchStoreAlert(
                         titleKey: "common.failed",
                         messageKey: capturedFailure.localizationKey,
@@ -816,8 +826,7 @@ struct GamePatchesView: View {
                     let key = isOn ? "patch.toggle_on_success" : "patch.toggle_off_success"
                     toast = ToastMessage(text: language.text(key, name))
                 }
-                // Show log on failure (chỉ tự động hiện khi mode = "dev")
-                if capturedFailure != nil && PatchLogConfig.isEnabled {
+                if capturedFailure != nil {
                     showPatchLog = true
                 }
             }
@@ -835,11 +844,12 @@ struct GamePatchesView: View {
                 Spacer()
                 Button {
                     var text = ""
-                    text += "3105 Log\n"
+                    text += "PROXY VIP VN Patch Log\n"
                     text += "iOS \(AppInfo.osVersion) (\(AppInfo.osBuild))\n"
                     text += "Generated: \(Date())\n\n"
                     text += appLog.entries.joined(separator: "\n")
                     UIPasteboard.general.string = text
+                    toast = ToastMessage(text: "Đã sao chép toàn bộ log!")
                 } label: {
                     Image(systemName: "doc.on.doc")
                         .font(.system(size: 12, weight: .semibold))

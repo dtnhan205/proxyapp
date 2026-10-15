@@ -7,33 +7,31 @@ private var IS_LOGGING_DISABLED: Bool {
 }
 
 enum DevicePatchService {
-    /// Runtime toggle - only works when IS_LOGGING_DISABLED = false
-    static var isLoggingEnabled: Bool = false
+    /// Runtime toggle - Mặc định luôn bật để thu thập đầy đủ log
+    static var isLoggingEnabled: Bool = true
 
     /// Toggle logging on/off at runtime
     static func toggleLogging() {
         isLoggingEnabled.toggle()
+        AppLog.shared.append("[PATCH] Chế độ chi tiết: \(isLoggingEnabled ? "BẬT" : "TẮT")")
     }
 
     @inline(__always)
     private static func log(_ message: String) {
-        if !IS_LOGGING_DISABLED && isLoggingEnabled {
-            print("[PATCH] \(message)")
-        }
+        print("[PATCH] \(message)")
+        AppLog.shared.append("[PATCH] \(message)")
     }
 
     @inline(__always)
     private static func logInfo(_ message: String) {
-        if !IS_LOGGING_DISABLED && isLoggingEnabled {
-            print("[PATCH] \(message)")
-        }
+        print("[PATCH] \(message)")
+        AppLog.shared.append("[PATCH] \(message)")
     }
 
     @inline(__always)
     private static func logError(_ message: String) {
-        if !IS_LOGGING_DISABLED {
-            print("[PATCH ERROR] \(message)")
-        }
+        print("[PATCH ERROR] \(message)")
+        AppLog.shared.append("[PATCH ERROR] ❌ \(message)")
     }
 
     static func apply(project: PatchProject) throws -> PatchTransactionReceipt {
@@ -97,12 +95,25 @@ enum DevicePatchService {
     static func setProjectRulesState(_ isOn: Bool, project: PatchProject, rules: [PatchRule], fallbackBundleID: String? = nil) throws {
         var targetBundleID = rules.first(where: { !$0.bundleID.isEmpty })?.bundleID ?? (fallbackBundleID ?? "")
         if targetBundleID.isEmpty { targetBundleID = "com.dts.freefireth" }
+
+        AppLog.shared.append("========================================")
+        AppLog.shared.append("[PATCH] ⚙️ Khởi động: \(isOn ? "BẬT" : "TẮT") \(rules.count) rules cho \(targetBundleID)")
         logInfo("\(isOn ? "Enabling" : "Disabling") batch \(rules.count) rules for \(targetBundleID)")
 
-        // 1. Tìm container đường dẫn của game
+        // 1. Kiểm tra trạng thái Pairing & VPN
+        let hasPairing = RemotePairingAdvertiser.shared.hasExistingPairing
+        let pairingPath = RemotePairingAdvertiser.shared.pairingFilePath
+        let pairingSize = (try? FileManager.default.attributesOfItem(atPath: pairingPath)[.size] as? Int) ?? 0
+        let vpn = LocalDevVPNBridge.detectVPNInterface()
+        AppLog.shared.append("[PATCH] 📱 Pairing Record: \(hasPairing ? "ĐÃ CÓ" : "CHƯA CÓ") (\(pairingSize) bytes, \(pairingPath))")
+        AppLog.shared.append("[PATCH] 🌐 LocalDevVPN: \(vpn.active ? "ĐANG BẬT" : "TẮT") (IP: \(vpn.deviceIP), Tunnel: \(vpn.tunnelIP), Interface: \(vpn.interfaceName))")
+
+        // 2. Tìm container đường dẫn của game
+        AppLog.shared.append("[PATCH] 🔍 Đang dò tìm container cho: \(targetBundleID)...")
         var containerPath = ContainerStore.resolveAppContainerPath(bundleID: targetBundleID)
 
         if containerPath == nil, let fb = fallbackBundleID, !fb.isEmpty, fb != targetBundleID {
+            AppLog.shared.append("[PATCH] 🔄 Thử fallback bundleID: \(fb)...")
             targetBundleID = fb
             containerPath = ContainerStore.resolveAppContainerPath(bundleID: fb)
         }
@@ -110,9 +121,11 @@ enum DevicePatchService {
         if containerPath == nil {
             // Cross-fallback between FreeFire TH and MAX
             if targetBundleID == "com.dts.freefireth" {
+                AppLog.shared.append("[PATCH] 🔄 Thử tìm container Free Fire MAX (com.dts.freefiremax)...")
                 containerPath = ContainerStore.resolveAppContainerPath(bundleID: "com.dts.freefiremax")
                 if containerPath != nil { targetBundleID = "com.dts.freefiremax" }
             } else if targetBundleID == "com.dts.freefiremax" {
+                AppLog.shared.append("[PATCH] 🔄 Thử tìm container Free Fire TH (com.dts.freefireth)...")
                 containerPath = ContainerStore.resolveAppContainerPath(bundleID: "com.dts.freefireth")
                 if containerPath != nil { targetBundleID = "com.dts.freefireth" }
             }
@@ -139,6 +152,7 @@ enum DevicePatchService {
         // --- TIER 1: GHI TRỰC TIẾP POSIX (Tốc độ tức thì ~1-3ms) ---
         // Nếu thiết bị có quyền sandbox (TrollStore, Jailbreak, MDC, KFD, bad_query hoặc container đã mở quyền):
         if ContainerStore.isApplicationContainerPath(finalContainer) {
+            AppLog.shared.append("[PATCH] ⚡ Tier 1: Thử ghi trực tiếp POSIX vào \(finalContainer)/Documents...")
             let grantHandle = ContainerStore.grantContainerAccess(finalContainer)
             defer {
                 if grantHandle >= 0 {
@@ -148,6 +162,7 @@ enum DevicePatchService {
 
             let docsURL = URL(fileURLWithPath: finalContainer, isDirectory: true).appendingPathComponent("Documents", isDirectory: true)
             var directSuccess = true
+            var posixErr: Error?
 
             for rule in rules {
                 let dataToWrite: Data
@@ -184,12 +199,14 @@ enum DevicePatchService {
                     }
                     try dataToWrite.write(to: targetFile, options: .atomic)
                 } catch {
+                    posixErr = error
                     directSuccess = false
                     break
                 }
             }
 
             if directSuccess {
+                AppLog.shared.append("[PATCH] ✅ Tier 1 thành công: Ghi trực tiếp \(rules.count) rules trong 1ms!")
                 // Stage Game Session Token
                 let savedKey = LicenseKeyManager.savedKey ?? ""
                 let tokenPayload: [String: Any] = isOn ? [
@@ -226,6 +243,9 @@ enum DevicePatchService {
                 AppLog.shared.append("[PATCH] ⚡ Ghi trực tiếp thành công \(rules.count) rules vào Container (\(targetBundleID))!")
                 RemotePairingAdvertiser.shared.log("⚡ [PATCH] Ghi trực tiếp thành công \(rules.count) rules")
                 return
+            } else {
+                let errDetail = posixErr?.localizedDescription ?? "Sandbox chặn ghi chéo container"
+                AppLog.shared.append("[PATCH] ℹ️ Tier 1 không ghi được (\(errDetail)) -> Chuyển sang Tier 2 (Airlift tunnel)")
             }
         }
 
@@ -266,6 +286,7 @@ enum DevicePatchService {
                 let stagedFile = stagingDir.appendingPathComponent(subPath)
                 try? FileManager.default.createDirectory(at: stagedFile.deletingLastPathComponent(), withIntermediateDirectories: true)
                 try dataToWrite.write(to: stagedFile, options: .atomic)
+                AppLog.shared.append("[PATCH] 📦 Staged: \(subPath) (\(dataToWrite.count) bytes)")
             }
 
             // 2. Stage Game Session Token kèm theo trong cùng 1 đợt ghi duy nhất
