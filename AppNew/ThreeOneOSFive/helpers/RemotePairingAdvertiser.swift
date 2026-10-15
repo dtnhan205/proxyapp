@@ -164,7 +164,7 @@ final class RemotePairingAdvertiser: NSObject, ObservableObject, NetServiceDeleg
     @Published var clientConnected: Bool = false
     @Published var pinCode: String = ""
     @Published var statusMessage: String = "Nhấn để sinh PIN & ghép đôi"
-    @Published var advertisedName: String = "INNOVA CHEAT"
+    @Published var advertisedName: String = "PROXY VIP VN"
     @Published var listeningPort: UInt16 = 53279
     @Published var isWiFiConnected: Bool = false
     @Published var isPublishedSuccessfully: Bool = false
@@ -189,6 +189,10 @@ final class RemotePairingAdvertiser: NSObject, ObservableObject, NetServiceDeleg
     // Đường dẫn lưu file pairing record trong Documents
     var pairingFilePath: String {
         let docs = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true)[0]
+        let proxyPath = (docs as NSString).appendingPathComponent("proxy_pairing.plist")
+        if FileManager.default.fileExists(atPath: proxyPath) {
+            return proxyPath
+        }
         let innovaPath = (docs as NSString).appendingPathComponent("innova_pairing.plist")
         if FileManager.default.fileExists(atPath: innovaPath) {
             return innovaPath
@@ -486,7 +490,7 @@ final class RemotePairingAdvertiser: NSObject, ObservableObject, NetServiceDeleg
     @discardableResult
     func syncPairingFile(from sourcePath: String) -> String {
         let docs = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true)[0]
-        let innovaURL = URL(fileURLWithPath: (docs as NSString).appendingPathComponent("innova_pairing.plist"))
+        let innovaURL = URL(fileURLWithPath: (docs as NSString).appendingPathComponent("proxy_pairing.plist"))
         let deltaURL = URL(fileURLWithPath: (docs as NSString).appendingPathComponent("delta_pairing.plist"))
         let aircardURL = URL(fileURLWithPath: (docs as NSString).appendingPathComponent("aircard_pairing.plist"))
         let airliftURL = URL(fileURLWithPath: (docs as NSString).appendingPathComponent("airlift_pairing.plist"))
@@ -521,7 +525,7 @@ final class RemotePairingAdvertiser: NSObject, ObservableObject, NetServiceDeleg
             "created_at": Date().timeIntervalSince1970,
             "is_local_generated": true
         ]
-        let plistURL = URL(fileURLWithPath: (docs as NSString).appendingPathComponent("innova_pairing.plist"))
+        let plistURL = URL(fileURLWithPath: (docs as NSString).appendingPathComponent("proxy_pairing.plist"))
         (dict as NSDictionary).write(to: plistURL, atomically: true)
         _ = syncPairingFile(from: plistURL.path)
 
@@ -757,7 +761,7 @@ enum AirliftBridge {
             throw NSError(
                 domain: "AirliftBridge",
                 code: 401,
-                userInfo: [NSLocalizedDescriptionKey: "Thiếu file pairing (innova_pairing.plist)! Vui lòng ghép đôi trước."]
+                userInfo: [NSLocalizedDescriptionKey: "Thiếu file pairing (proxy_pairing.plist)! Vui lòng ghép đôi trước."]
             )
         }
 

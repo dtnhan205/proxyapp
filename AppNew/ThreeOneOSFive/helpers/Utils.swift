@@ -29,7 +29,7 @@ class AppLog: ObservableObject {
         return docs.appendingPathComponent("log.txt")
     }
 
-    private let fileQueue = DispatchQueue(label: "com.innova.logger.file", qos: .utility)
+    private let fileQueue = DispatchQueue(label: "com.proxyvipvn.logger.file", qos: .utility)
     private var fileHandle: FileHandle?
     private let timeFormatter: DateFormatter = {
         let df = DateFormatter()

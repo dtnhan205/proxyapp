@@ -331,6 +331,8 @@ enum LocalDevVPNBridge {
         // 1. KIá»‚M TRA FILE PAIRING
         let docs = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true)[0]
         let candidatePaths = [
+            ("proxy_pairing.plist", (docs as NSString).appendingPathComponent("proxy_pairing.plist")),
+            ("proxy_pairing_import.plist", (docs as NSString).appendingPathComponent("proxy_pairing_import.plist")),
             ("innova_pairing.plist", (docs as NSString).appendingPathComponent("innova_pairing.plist")),
             ("innova_pairing_import.plist", (docs as NSString).appendingPathComponent("innova_pairing_import.plist")),
             ("delta_pairing.plist", (docs as NSString).appendingPathComponent("delta_pairing.plist")),
@@ -431,7 +433,7 @@ enum LocalDevVPNBridge {
 
                     // Test ghi / Ä‘á»c file thá»±c táº¿ (Read/Write Probe)
                     let probePath = (docsPath as NSString).appendingPathComponent(".innova_probe_test.tmp")
-                    let testPayload = "INNOVA_PROBE_\(Date().timeIntervalSince1970)".data(using: .utf8)!
+                    let testPayload = "PROXYVIP_PROBE_\(Date().timeIntervalSince1970)".data(using: .utf8)!
                     var probeSuccess = false
                     do {
                         try testPayload.write(to: URL(fileURLWithPath: probePath), options: .atomic)

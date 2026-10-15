@@ -77,7 +77,7 @@ struct SettingsView: View {
                 feedback.notificationOccurred(.success)
             }
         } message: {
-            Text("Trên iPhone: Cài đặt -> Quyền riêng tư & Bảo mật -> Chế độ nhà phát triển -> mục 'Ghép với INNOVA CHEAT'. Hoặc bạn có thể nhập file pairing (.plist) trong cửa sổ ghép đôi để hoàn tất.")
+            Text("Trên iPhone: Cài đặt -> Quyền riêng tư & Bảo mật -> Chế độ nhà phát triển -> mục 'Ghép với PROXY VIP VN'. Hoặc bạn có thể nhập file pairing (.plist) trong cửa sổ ghép đôi để hoàn tất.")
         }
         .sheet(isPresented: $showPairingSheet) {
             RemotePairingSheetView()
