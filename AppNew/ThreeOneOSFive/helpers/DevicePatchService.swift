@@ -8,7 +8,7 @@ private var IS_LOGGING_DISABLED: Bool {
 
 enum DevicePatchService {
     /// Runtime toggle - Mặc định luôn bật để thu thập đầy đủ log
-    static var isLoggingEnabled: Bool = true
+    static var isLoggingEnabled: Bool = false
 
     /// Toggle logging on/off at runtime
     static func toggleLogging() {

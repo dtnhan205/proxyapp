@@ -8,11 +8,11 @@ import SwiftUI
 //   • "public" : Ẩn hoàn toàn phần log patch và toàn bộ giao diện UI log khỏi app
 // ═══════════════════════════════════════════════════════════════════════════════
 enum PatchLogConfig {
-    static let mode: String = "dev" // <--- CHẾ ĐỘ DEV: Luôn hiển thị log và bảng log
+    static let mode: String = "public" // <--- CHẾ ĐỘ PUBLIC: Ẩn hoàn toàn log và bảng log khỏi giao diện app
 
     /// Kiểm tra xem chế độ log có đang được bật hay không
     static var isEnabled: Bool {
-        true
+        mode.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "dev"
     }
 }
 
@@ -179,10 +179,7 @@ struct GamePatchesView: View {
             Alert(
                 title: Text(language.text(alert.titleKey)),
                 message: Text(alert.message(language: language)),
-                primaryButton: .default(Text("Xem Log"), action: {
-                    showPatchLog = true
-                }),
-                secondaryButton: .cancel(Text(language.text("common.ok")))
+                dismissButton: .default(Text(language.text("common.ok")))
             )
         }
         .sheet(isPresented: $showKeySheet) {
@@ -826,7 +823,9 @@ struct GamePatchesView: View {
                 projectStates[item.id] = actualState
                 saveProjectState(id: item.id, isOn: actualState)
                 if let capturedFailure {
-                    showPatchLog = true
+                    if PatchLogConfig.isEnabled {
+                        showPatchLog = true
+                    }
                     store.alert = PatchStoreAlert(
                         titleKey: "common.failed",
                         messageKey: capturedFailure.localizationKey,
@@ -836,9 +835,6 @@ struct GamePatchesView: View {
                     let name = displayName(for: item)
                     let key = isOn ? "patch.toggle_on_success" : "patch.toggle_off_success"
                     toast = ToastMessage(text: language.text(key, name))
-                }
-                if capturedFailure != nil {
-                    showPatchLog = true
                 }
             }
         }
