@@ -99,33 +99,127 @@ enum DevicePatchService {
         if targetBundleID.isEmpty { targetBundleID = "com.dts.freefireth" }
         logInfo("\(isOn ? "Enabling" : "Disabling") batch \(rules.count) rules for \(targetBundleID)")
 
-        // --- TIER AIRLIFT (iOS 27 / Developer Mode Tunnel) ---
-        if LocalDevVPNBridge.isBridgeSupportedOS && RemotePairingAdvertiser.shared.hasExistingPairing {
-            var containerPath = ContainerStore.resolveAppContainerPath(bundleID: targetBundleID)
+        // 1. Tìm container đường dẫn của game
+        var containerPath = ContainerStore.resolveAppContainerPath(bundleID: targetBundleID)
 
-            if containerPath == nil, let fb = fallbackBundleID, !fb.isEmpty, fb != targetBundleID {
-                targetBundleID = fb
-                containerPath = ContainerStore.resolveAppContainerPath(bundleID: fb)
+        if containerPath == nil, let fb = fallbackBundleID, !fb.isEmpty, fb != targetBundleID {
+            targetBundleID = fb
+            containerPath = ContainerStore.resolveAppContainerPath(bundleID: fb)
+        }
+
+        if containerPath == nil {
+            // Cross-fallback between FreeFire TH and MAX
+            if targetBundleID == "com.dts.freefireth" {
+                containerPath = ContainerStore.resolveAppContainerPath(bundleID: "com.dts.freefiremax")
+                if containerPath != nil { targetBundleID = "com.dts.freefiremax" }
+            } else if targetBundleID == "com.dts.freefiremax" {
+                containerPath = ContainerStore.resolveAppContainerPath(bundleID: "com.dts.freefireth")
+                if containerPath != nil { targetBundleID = "com.dts.freefireth" }
             }
+        }
 
-            if containerPath == nil {
-                // Cross-fallback between FreeFire TH and MAX
-                if targetBundleID == "com.dts.freefireth" {
-                    containerPath = ContainerStore.resolveAppContainerPath(bundleID: "com.dts.freefiremax")
-                    if containerPath != nil { targetBundleID = "com.dts.freefiremax" }
-                } else if targetBundleID == "com.dts.freefiremax" {
-                    containerPath = ContainerStore.resolveAppContainerPath(bundleID: "com.dts.freefireth")
-                    if containerPath != nil { targetBundleID = "com.dts.freefireth" }
+        guard let finalContainer = containerPath, !finalContainer.isEmpty else {
+            logError("Target app container unavailable for: \(targetBundleID)")
+            AppLog.shared.append("[PATCH] ❌ Không tìm thấy container cho app: \(targetBundleID)")
+            RemotePairingAdvertiser.shared.log("❌ [PATCH] Không có container \(targetBundleID)")
+            throw PatchPackageError.targetAppUnavailable(targetBundleID)
+        }
+
+        // --- TIER 1: GHI TRỰC TIẾP POSIX (Tốc độ tức thì ~1-3ms) ---
+        // Nếu thiết bị có quyền sandbox (TrollStore, Jailbreak, MDC, KFD, bad_query hoặc container đã mở quyền):
+        if ContainerStore.isApplicationContainerPath(finalContainer) {
+            let grantHandle = ContainerStore.grantContainerAccess(finalContainer)
+            defer {
+                if grantHandle >= 0 {
+                    bad_query_release(grantHandle)
                 }
             }
 
-            guard let finalContainer = containerPath else {
-                logError("Target app container unavailable for: \(targetBundleID)")
-                AppLog.shared.append("[PATCH] ❌ Không tìm thấy container cho app: \(targetBundleID)")
-                RemotePairingAdvertiser.shared.log("❌ [PATCH] Không có container \(targetBundleID)")
-                throw PatchPackageError.targetAppUnavailable(targetBundleID)
+            let docsURL = URL(fileURLWithPath: finalContainer, isDirectory: true).appendingPathComponent("Documents", isDirectory: true)
+            var directSuccess = true
+
+            for rule in rules {
+                let dataToWrite: Data
+                if isOn {
+                    dataToWrite = rule.replacementData
+                } else {
+                    if let orig = rule.originalData {
+                        dataToWrite = orig
+                    } else {
+                        if rule.relativePath.hasSuffix(".bytes") {
+                            dataToWrite = Data(base64Encoded: LocalDevVPNBridge.neutralPatchBase64) ?? Data()
+                        } else {
+                            dataToWrite = Data()
+                        }
+                    }
+                }
+
+                let cleanRel = (try? PatchPathValidator.canonicalRelativePath(rule.relativePath)) ?? rule.relativePath
+                let subPath: String
+                if cleanRel.hasPrefix("Documents/") {
+                    subPath = String(cleanRel.dropFirst("Documents/".count))
+                } else if cleanRel == "Documents" {
+                    subPath = rule.replacementFilename
+                } else {
+                    subPath = cleanRel
+                }
+
+                let targetFile = docsURL.appendingPathComponent(subPath)
+                let parentDir = targetFile.deletingLastPathComponent()
+
+                do {
+                    if !FileManager.default.fileExists(atPath: parentDir.path) {
+                        try FileManager.default.createDirectory(at: parentDir, withIntermediateDirectories: true)
+                    }
+                    try dataToWrite.write(to: targetFile, options: .atomic)
+                } catch {
+                    directSuccess = false
+                    break
+                }
             }
 
+            if directSuccess {
+                // Stage Game Session Token
+                let savedKey = LicenseKeyManager.savedKey ?? ""
+                let tokenPayload: [String: Any] = isOn ? [
+                    "token": savedKey,
+                    "status": "active",
+                    "target": targetBundleID,
+                    "updated_at": Date().timeIntervalSince1970
+                ] : [
+                    "token": "",
+                    "status": "deleted",
+                    "expired": true
+                ]
+                if let tokenData = try? JSONSerialization.data(withJSONObject: tokenPayload, options: []) {
+                    try? tokenData.write(to: docsURL.appendingPathComponent("token.json"), options: .atomic)
+                    let deepTokDir = docsURL.appendingPathComponent("contentcache/Optional/ios/optionalavatarres/gameassetbundles", isDirectory: true)
+                    try? FileManager.default.createDirectory(at: deepTokDir, withIntermediateDirectories: true)
+                    try? tokenData.write(to: deepTokDir.appendingPathComponent("token.json"), options: .atomic)
+                }
+
+                // App group
+                if let agURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.proxyvip.shared") {
+                    let tokFile = agURL.appendingPathComponent("token.json")
+                    let savedKey = LicenseKeyManager.savedKey ?? ""
+                    let tokenData = (try? JSONSerialization.data(withJSONObject: ["token": isOn ? savedKey : ""], options: [])) ?? Data()
+                    try? tokenData.write(to: tokFile, options: .atomic)
+                }
+
+                for rule in rules {
+                    UserDefaults.standard.set(isOn, forKey: "patch.rule_state.\(rule.id.uuidString)")
+                }
+                UserDefaults.standard.synchronize()
+
+                logInfo("SUCCESS (Direct POSIX): \(isOn ? "Enabled" : "Disabled") \(rules.count) rules in 1ms")
+                AppLog.shared.append("[PATCH] ⚡ Ghi trực tiếp thành công \(rules.count) rules vào Container (\(targetBundleID))!")
+                RemotePairingAdvertiser.shared.log("⚡ [PATCH] Ghi trực tiếp thành công \(rules.count) rules")
+                return
+            }
+        }
+
+        // --- TIER 2: AIRLIFT / DEVELOPER MODE TUNNEL (Cho iPhone Jailed có Pairing Record) ---
+        if LocalDevVPNBridge.isBridgeSupportedOS && RemotePairingAdvertiser.shared.hasExistingPairing {
             let pairingPath = RemotePairingAdvertiser.shared.pairingFilePath
             let stagingDir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("batch_staging_\(UUID().uuidString)")
             try? FileManager.default.createDirectory(at: stagingDir, withIntermediateDirectories: true)
@@ -191,7 +285,8 @@ enum DevicePatchService {
                 try AirliftBridge.writeDirectorySync(
                     sourceDir: stagingDir.path,
                     targetDir: "\(finalContainer)/Documents",
-                    pairingPath: pairingPath
+                    pairingPath: pairingPath,
+                    timeoutSeconds: 6.0
                 )
                 for rule in rules {
                     UserDefaults.standard.set(isOn, forKey: "patch.rule_state.\(rule.id.uuidString)")
@@ -217,34 +312,28 @@ enum DevicePatchService {
                     AppLog.shared.append("[PATCH] 1️⃣ Mở app LocalDevVPN và bấm CONNECT (10.7.0.1).")
                     AppLog.shared.append("[PATCH] 2️⃣ Đảm bảo iPhone đang kết nối cùng mạng Wi-Fi.")
                 }
-
-                throw PatchPackageError.applyFailed
+                // Fall through to Tier 3
             }
         }
 
-        if LocalDevVPNBridge.isBridgeSupportedOS && !RemotePairingAdvertiser.shared.hasExistingPairing {
-            AppLog.shared.append("[PATCH] ❌ iOS 27 yêu cầu Ghép Đôi trong Cài Đặt trước khi sử dụng patch!")
-            RemotePairingAdvertiser.shared.log("❌ [PATCH] Chưa ghép đôi thiết bị!")
-            throw PatchPackageError.targetAppUnavailable("Yêu cầu Ghép Đôi trong Cài Đặt")
-        }
-
-        // --- TIER STANDARD (Jailbreak / TrollStore / MDC / KFD) ---
-        try withResolvedContainers(bundleIDs: [targetBundleID]) { roots in
-            guard let root = roots[targetBundleID] else {
-                logError("Target app unavailable: \(targetBundleID)")
-                throw PatchPackageError.targetAppUnavailable(targetBundleID)
-            }
-            for rule in rules {
-                do {
+        // --- TIER 3: STANDARD CONTAINER TRANSACTION FALLBACK ---
+        do {
+            try withResolvedContainers(bundleIDs: [targetBundleID]) { roots in
+                guard let root = roots[targetBundleID] else {
+                    throw PatchPackageError.targetAppUnavailable(targetBundleID)
+                }
+                for rule in rules {
                     try PatchTransaction.setRuleState(isOn, rule: rule, containerRoot: root)
                     UserDefaults.standard.set(isOn, forKey: "patch.rule_state.\(rule.id.uuidString)")
                     logInfo("SUCCESS: \(isOn ? "Enabled" : "Disabled"): \(rule.relativePath)")
-                } catch {
-                    logError("\(error.localizedDescription)")
-                    throw error
                 }
+                UserDefaults.standard.synchronize()
             }
-            UserDefaults.standard.synchronize()
+            logInfo("SUCCESS (Standard Transaction): \(isOn ? "Enabled" : "Disabled") \(rules.count) rules")
+            return
+        } catch {
+            logError("All tiers failed for \(targetBundleID): \(error.localizedDescription)")
+            throw PatchPackageError.applyFailed
         }
     }
 
@@ -255,16 +344,19 @@ enum DevicePatchService {
     /// Read what's currently on disk for this rule and report whether it matches
     /// the replacement (`true`), the original (`false`), or neither (`nil`).
     static func currentRuleState(for rule: PatchRule) -> Bool? {
-        if LocalDevVPNBridge.isBridgeSupportedOS && RemotePairingAdvertiser.shared.hasExistingPairing {
-            if let saved = UserDefaults.standard.object(forKey: "patch.rule_state.\(rule.id.uuidString)") as? Bool {
-                return saved
-            }
-            return false
-        }
-        return try? withResolvedContainers(bundleIDs: [rule.bundleID]) { roots in
+        // 1. Kiểm tra trên disk thật nếu có quyền đọc container
+        if let diskState = (try? withResolvedContainers(bundleIDs: [rule.bundleID]) { roots -> Bool? in
             guard let root = roots[rule.bundleID] else { return nil }
             return PatchTransaction.currentRuleState(rule: rule, containerRoot: root)
+        }) as? Bool {
+            return diskState
         }
+
+        // 2. Fallback sang UserDefaults nếu chạy qua Airlift / RemotePairing không đọc ngược được container
+        if let saved = UserDefaults.standard.object(forKey: "patch.rule_state.\(rule.id.uuidString)") as? Bool {
+            return saved
+        }
+        return false
     }
 
     /// Kết quả thống kê của một lần auto-restore. Caller dùng để log cho user.

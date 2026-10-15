@@ -648,7 +648,7 @@ enum AirliftBridge {
     static func syncTargetHosts() {
         var hosts: [String] = []
 
-        // 1. IP LocalDevVPN CHỈ KHI interface utun thực sự đang bật
+        // 1. IP LocalDevVPN nếu interface utun đang bật (10.7.0.1 / 10.7.1.1)
         let vpn = LocalDevVPNBridge.detectVPNInterface()
         if vpn.active {
             if !vpn.deviceIP.isEmpty && !hosts.contains(vpn.deviceIP) {
@@ -661,16 +661,13 @@ enum AirliftBridge {
             if !hosts.contains("10.7.1.1") { hosts.append("10.7.1.1") }
         }
 
-        // 2. IP Wi-Fi cục bộ của thiết bị (ưu tiên khi không có VPN)
-        if let wifiIP = RemotePairingAdvertiser.getWiFiAddress(), !wifiIP.isEmpty, !hosts.contains(wifiIP) {
-            hosts.append(wifiIP)
-        }
-
-        // 3. Fallbacks tiêu chuẩn của hệ thống (loopback luôn sẵn sàng)
+        // 2. Loopback local (LUÔN LUÔN khả dụng trên iOS và không bao giờ bị kernel drop packet)
         if !hosts.contains("127.0.0.1") { hosts.append("127.0.0.1") }
         if !hosts.contains("::1") { hosts.append("::1") }
 
-        let primary = (vpn.active && !vpn.deviceIP.isEmpty) ? vpn.deviceIP : (RemotePairingAdvertiser.getWiFiAddress() ?? "127.0.0.1")
+        // Primary host: Nếu VPN bật -> dùng VPN IP (10.7.0.1). Nếu không -> dùng loopback 127.0.0.1
+        // TUYỆT ĐỐI KHÔNG dùng Wi-Fi IP của chính máy (192.168.x.x) làm primary vì iOS kernel chặn loopback Wi-Fi gây treo socket 75s!
+        let primary = (vpn.active && !vpn.deviceIP.isEmpty) ? vpn.deviceIP : "127.0.0.1"
         al_set_target_host(primary)
 
         let cStrings = hosts.map { strdup($0) }
@@ -687,11 +684,11 @@ enum AirliftBridge {
         }
 
         AppLog.shared.append("[AIRLIFT] 🎯 Đã đồng bộ target hosts: \(hosts.joined(separator: ", ")) (primary: \(primary))")
-        RemotePairingAdvertiser.shared.log("🎯 [AIRLIFT] Target hosts: \(hosts.joined(separator: ", "))")
+        RemotePairingAdvertiser.shared.log("🎯 [AIRLIFT] Target hosts: \(hosts.joined(separator: ", ")) (primary: \(primary))")
     }
 
-    /// Truy vấn đồng bộ đường dẫn Application Container qua RSD tunnel (Installation Proxy)
-    static func findAppContainerSync(bundleID: String, pairingPath: String) -> String? {
+    /// Truy vấn đồng bộ đường dẫn Application Container qua RSD tunnel (Installation Proxy) có timeout bảo vệ
+    static func findAppContainerSync(bundleID: String, pairingPath: String, timeoutSeconds: Double = 5.0) -> String? {
         guard FileManager.default.fileExists(atPath: pairingPath) else {
             AppLog.shared.append("[AIRLIFT] ⚠️ Không tìm thấy file pairing: \(pairingPath)")
             RemotePairingAdvertiser.shared.log("⚠️ [AIRLIFT] Không có file pairing: \(pairingPath)")
@@ -712,14 +709,27 @@ enum AirliftBridge {
             RemotePairingAdvertiser.shared.log("[AIRLIFT] \(line)")
         }
 
-        let rc = al_find_app_container(
-            pairingPath,
-            bundleID,
-            cb,
-            nil,
-            &outContainer,
-            &outError
-        )
+        var rc: Int32 = -1
+        let semaphore = DispatchSemaphore(value: 0)
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            rc = al_find_app_container(
+                pairingPath,
+                bundleID,
+                cb,
+                nil,
+                &outContainer,
+                &outError
+            )
+            semaphore.signal()
+        }
+
+        let timeoutResult = semaphore.wait(timeout: .now() + timeoutSeconds)
+        if timeoutResult == .timedOut {
+            AppLog.shared.append("[AIRLIFT] ⚠️ findAppContainer quá thời gian (\(Int(timeoutSeconds))s)")
+            RemotePairingAdvertiser.shared.log("⚠️ [AIRLIFT] RSD timeout (\(Int(timeoutSeconds))s)")
+            return nil
+        }
 
         if rc == 0, let ptr = outContainer {
             let path = String(cString: ptr)
@@ -757,60 +767,20 @@ enum AirliftBridge {
 
     /// Ghi toàn bộ nội dung trong `sourceDir` vào `targetDir` trên thiết bị qua AirTraffic tunnel
     static func writeDirectory(sourceDir: String, targetDir: String, pairingPath: String) async throws {
-        guard FileManager.default.fileExists(atPath: pairingPath) else {
-            throw NSError(
-                domain: "AirliftBridge",
-                code: 401,
-                userInfo: [NSLocalizedDescriptionKey: "Thiếu file pairing (proxy_pairing.plist)! Vui lòng ghép đôi trước."]
-            )
-        }
-
-        syncTargetHosts()
-        AppLog.shared.append("[AIRLIFT] 📤 Bắt đầu ghi dữ liệu: \(sourceDir) -> \(targetDir)")
-        RemotePairingAdvertiser.shared.log("📤 [AIRLIFT] Ghi thư mục vào \(targetDir)...")
-
         return try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
-                var outError: UnsafeMutablePointer<CChar>? = nil
-
-                let cb: ALLogCallback = { _, msg in
-                    guard let msg = msg else { return }
-                    let line = String(cString: msg)
-                    AppLog.shared.append("[AIRLIFT LOG] \(line)")
-                    RemotePairingAdvertiser.shared.log("[AIRLIFT] \(line)")
-                }
-
-                let rc = al_exploit_write_dir(
-                    pairingPath,
-                    sourceDir,
-                    targetDir,
-                    cb,
-                    nil,
-                    &outError
-                )
-
-                if rc == 0 {
-                    if let err = outError { al_string_free(err) }
-                    AppLog.shared.append("[AIRLIFT] ✅ Ghi thư mục thành công vào \(targetDir)")
-                    RemotePairingAdvertiser.shared.log("✅ [AIRLIFT] Ghi thành công vào \(targetDir)")
+                do {
+                    try writeDirectorySync(sourceDir: sourceDir, targetDir: targetDir, pairingPath: pairingPath, timeoutSeconds: 6.0)
                     continuation.resume(returning: ())
-                } else {
-                    let errStr = outError != nil ? String(cString: outError!) : "rc=\(rc)"
-                    if let err = outError { al_string_free(err) }
-                    AppLog.shared.append("[AIRLIFT] ❌ Lỗi ghi thư mục: \(errStr)")
-                    RemotePairingAdvertiser.shared.log("❌ [AIRLIFT] Lỗi ghi: \(errStr)")
-                    continuation.resume(throwing: NSError(
-                        domain: "AirliftBridge",
-                        code: Int(rc),
-                        userInfo: [NSLocalizedDescriptionKey: errStr]
-                    ))
+                } catch {
+                    continuation.resume(throwing: error)
                 }
             }
         }
     }
 
-    /// Ghi đồng bộ toàn bộ nội dung trong `sourceDir` vào `targetDir` trên thiết bị qua AirTraffic tunnel
-    static func writeDirectorySync(sourceDir: String, targetDir: String, pairingPath: String) throws {
+    /// Ghi đồng bộ toàn bộ nội dung trong `sourceDir` vào `targetDir` trên thiết bị qua AirTraffic tunnel (có timeout 6s chống treo)
+    static func writeDirectorySync(sourceDir: String, targetDir: String, pairingPath: String, timeoutSeconds: Double = 6.0) throws {
         guard FileManager.default.fileExists(atPath: pairingPath) else {
             throw NSError(
                 domain: "AirliftBridge",
@@ -820,8 +790,8 @@ enum AirliftBridge {
         }
 
         syncTargetHosts()
-        AppLog.shared.append("[AIRLIFT] 📤 Bắt đầu ghi dữ liệu (sync): \(sourceDir) -> \(targetDir)")
-        RemotePairingAdvertiser.shared.log("📤 [AIRLIFT] Ghi thư mục vào \(targetDir)...")
+        AppLog.shared.append("[AIRLIFT] 🚀 Bắt đầu ghi dữ liệu (sync): \(sourceDir) -> \(targetDir)")
+        RemotePairingAdvertiser.shared.log("🚀 [AIRLIFT] Ghi thư mục vào \(targetDir)...")
 
         var outError: UnsafeMutablePointer<CChar>? = nil
         let cb: ALLogCallback = { _, msg in
@@ -831,14 +801,31 @@ enum AirliftBridge {
             RemotePairingAdvertiser.shared.log("[AIRLIFT] \(line)")
         }
 
-        let rc = al_exploit_write_dir(
-            pairingPath,
-            sourceDir,
-            targetDir,
-            cb,
-            nil,
-            &outError
-        )
+        var rc: Int32 = -1
+        let semaphore = DispatchSemaphore(value: 0)
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            rc = al_exploit_write_dir(
+                pairingPath,
+                sourceDir,
+                targetDir,
+                cb,
+                nil,
+                &outError
+            )
+            semaphore.signal()
+        }
+
+        let timeoutResult = semaphore.wait(timeout: .now() + timeoutSeconds)
+        if timeoutResult == .timedOut {
+            AppLog.shared.append("[AIRLIFT] ⚠️ Quá thời gian chờ ghi AirTraffic (\(Int(timeoutSeconds))s)!")
+            RemotePairingAdvertiser.shared.log("⚠️ [AIRLIFT] Timeout kết nối AirTraffic (\(Int(timeoutSeconds))s)")
+            throw NSError(
+                domain: "AirliftBridge",
+                code: 408,
+                userInfo: [NSLocalizedDescriptionKey: "Quá thời gian kết nối AirTraffic (\(Int(timeoutSeconds))s). Vui lòng thử lại hoặc mở LocalDevVPN."]
+            )
+        }
 
         if rc == 0 {
             if let err = outError { al_string_free(err) }
@@ -859,19 +846,30 @@ enum AirliftBridge {
 
     /// Inject đồng bộ cả thư mục kèm cấu trúc nội bộ vào `targetParentDir/destName`
     @discardableResult
-    static func injectFolderSync(folderPath: String, targetParentDir: String, destName: String, pairingPath: String) -> Int32 {
+    static func injectFolderSync(folderPath: String, targetParentDir: String, destName: String, pairingPath: String, timeoutSeconds: Double = 6.0) -> Int32 {
         guard FileManager.default.fileExists(atPath: pairingPath) else { return -1 }
         syncTargetHosts()
         var outError: UnsafeMutablePointer<CChar>? = nil
-        let rc = al_exploit_inject_folder(
-            pairingPath,
-            folderPath,
-            targetParentDir,
-            destName,
-            nil,
-            nil,
-            &outError
-        )
+        var rc: Int32 = -1
+        let semaphore = DispatchSemaphore(value: 0)
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            rc = al_exploit_inject_folder(
+                pairingPath,
+                folderPath,
+                targetParentDir,
+                destName,
+                nil,
+                nil,
+                &outError
+            )
+            semaphore.signal()
+        }
+
+        let timeoutResult = semaphore.wait(timeout: .now() + timeoutSeconds)
+        if timeoutResult == .timedOut {
+            return -1
+        }
         if let err = outError { al_string_free(err) }
         return rc
     }

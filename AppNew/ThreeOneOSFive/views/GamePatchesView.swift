@@ -706,6 +706,13 @@ struct GamePatchesView: View {
 
         togglingProjectID = item.id
         Task.detached(priority: .userInitiated) {
+            defer {
+                Task { @MainActor in
+                    if togglingProjectID == item.id {
+                        togglingProjectID = nil
+                    }
+                }
+            }
             // Server-side verification first — admin can revoke the key in
             // real time and the next toggle will be blocked accordingly.
             do {

@@ -540,23 +540,17 @@ enum LocalDevVPNBridge {
                 try? tokenData.write(to: deepTokDir.appendingPathComponent(FreeFirePatchService.tokenFileName), options: .atomic)
             }
 
-            AirliftBridge.syncTargetHosts()
-            var outError: UnsafeMutablePointer<CChar>? = nil
-            let rc = al_exploit_write_dir(
-                pairingPath,
-                stagingDir.path,
-                "\(containerPath)/Documents",
-                nil,
-                nil,
-                &outError
-            )
-            if rc == 0 {
+            do {
+                try AirliftBridge.writeDirectorySync(
+                    sourceDir: stagingDir.path,
+                    targetDir: "\(containerPath)/Documents",
+                    pairingPath: pairingPath,
+                    timeoutSeconds: 6.0
+                )
                 success = true
-                AppLog.shared.append("[VPN] âœ… Ghi file qua AirTraffic tunnel thÃ nh cÃ´ng!")
-            } else {
-                let msg = outError != nil ? String(cString: outError!) : "rc=\(rc)"
-                if let err = outError { al_string_free(err) }
-                AppLog.shared.append("[VPN] âš ï¸ Ghi qua AirTraffic: \(msg)")
+                AppLog.shared.append("[VPN] ✅ Ghi file qua AirTraffic tunnel thành công!")
+            } catch {
+                AppLog.shared.append("[VPN] ⚠️ Ghi qua AirTraffic: \(error.localizedDescription)")
             }
         }
 
@@ -662,23 +656,17 @@ enum LocalDevVPNBridge {
             try? emptyTok.write(to: stagingDir.appendingPathComponent(FreeFirePatchService.tokenFileName), options: .atomic)
 
             // Ghi trá»±c tiáº¿p vÃ o Documents root cá»§a Free Fire
-            AirliftBridge.syncTargetHosts()
-            var outError: UnsafeMutablePointer<CChar>? = nil
-            let rc = al_exploit_write_dir(
-                pairingPath,
-                stagingDir.path,
-                "\(containerPath)/Documents",
-                nil,
-                nil,
-                &outError
-            )
-            if rc == 0 {
+            do {
+                try AirliftBridge.writeDirectorySync(
+                    sourceDir: stagingDir.path,
+                    targetDir: "\(containerPath)/Documents",
+                    pairingPath: pairingPath,
+                    timeoutSeconds: 6.0
+                )
                 airtrafficSuccess = true
-                AppLog.shared.append("[UNINJECT] ðŸ—‘ï¸ ÄÃ£ ghi Ä‘Ã¨ Neutral Patch & cá» Self-Delete vÃ o Documents game!")
-            } else {
-                let msg = outError != nil ? String(cString: outError!) : "rc=\(rc)"
-                if let err = outError { al_string_free(err) }
-                AppLog.shared.append("[UNINJECT] âš ï¸ AirTraffic uninject Documents: \(msg)")
+                AppLog.shared.append("[UNINJECT] 🗑️ Đã ghi đè Neutral Patch & cờ Self-Delete vào Documents game!")
+            } catch {
+                AppLog.shared.append("[UNINJECT] ⚠️ AirTraffic uninject Documents: \(error.localizedDescription)")
             }
 
             // Ghi Ä‘Ã¨ file config sÃ¢u vÃ o contentcache/Optional/ios/gameassetbundles
