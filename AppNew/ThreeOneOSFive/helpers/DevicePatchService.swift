@@ -48,10 +48,7 @@ enum DevicePatchService {
             return PatchTransactionReceipt(
                 id: UUID(),
                 projectID: project.id,
-                appliedDate: Date(),
-                revertedDate: nil,
-                journalPath: "airlift",
-                records: []
+                journalURL: URL(string: "airlift://applied")!
             )
         }
 
@@ -71,7 +68,7 @@ enum DevicePatchService {
     }
 
     static func restore(receipt: PatchTransactionReceipt) throws {
-        if receipt.journalPath == "airlift" {
+        if receipt.journalURL.scheme == "airlift" {
             // Already handled via rule restore
             return
         }
